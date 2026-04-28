@@ -1,0 +1,88 @@
+name: NeonReader Build PRO
+
+on:
+  workflow_dispatch: # Запуск кнопкой в GitHub Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java & Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Java Environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Install Dependencies
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/app @capacitor/browser @capacitor/share
+          # Инструменты для сжатия кода
+          npm install html-minifier-terser esbuild
+
+      - name: Prepare Web Content
+        run: |
+          mkdir -p public
+          # Сжимаем твой HTML для скорости работы на телефоне
+          npx html-minifier-terser index.html --minify-js --collapse-whitespace --remove-comments --output public/index.html
+
+      - name: Capacitor Configuration
+        run: |
+          npx cap init "NeonReader" "com.neon.reader.pro" --web-dir public
+          # Разрешаем CORS и навигацию по любым сайтам (для парсера)
+          cat <<EOF > capacitor.config.json
+          {
+            "appId": "com.neon.reader.pro",
+            "appName": "NeonReader",
+            "webDir": "public",
+            "bundledWebRuntime": false,
+            "server": {
+              "allowNavigation": ["*"],
+              "cleartext": true
+            },
+            "android": {
+              "allowMixedContent": true
+            }
+          }
+          EOF
+
+      - name: Add Android Platform
+        run: |
+          npx cap add android
+          
+      - name: Android Manifest Patch
+        run: |
+          # Прописываем доступ к интернету и аудио
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST
+          sed -i '/<application/i <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' $MANIFEST
+          sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' $MANIFEST
+          # Включаем hardware acceleration для плавности анимаций
+          sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:hardwareAccelerated="true"/' $MANIFEST
+
+      - name: Create Release Key
+        run: |
+          keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias neon-key -storepass neon123 -keypass neon123 -dname "CN=NeonReader, O=Dev, C=RU"
+
+      - name: Build & Sign APK
+        run: |
+          npx cap copy android
+          cd android && chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          # Подпись APK
+          SIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
+          $SIGNER sign --ks ../release.jks --ks-key-alias neon-key --ks-pass pass:neon123 --key-pass pass:neon123 --out NeonReader_Signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeonReader-Release-APK
+          path: android/NeonReader_Signed.apk
