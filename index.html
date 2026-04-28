@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="referrer" content="no-referrer">
+    <title>NeonReader: Custom Cyberpunk</title>
+    <style>
+        :root {
+            --bg-base: #0a0a0f;
+            --text-color: #f1f5f9;
+            --theme-hex: #a855f7; 
+            --theme-rgb: 168, 85, 247;
+            --glow-int: 1; 
+            
+            --glass-panel: rgba(15, 15, 22, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --danger: #ef4444;
+            --subtext: rgba(255, 255, 255, 0.5);
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        
+        body { 
+            background-color: var(--bg-base); 
+            color: var(--text-color); font-family: var(--font); 
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden; 
+            position: relative; transition: background-color 0.3s, color 0.3s;
+        }
+        
+        /* ДИНАМИЧЕСКИЙ НЕОНОВЫЙ ФОН */
+        #bg-glow {
+            position: absolute; top: 0; left: 0; right: 0; height: 70vh;
+            background: radial-gradient(ellipse at 50% -10%, rgba(var(--theme-rgb), calc(0.25 * var(--glow-int))) 0%, transparent 70%);
+            pointer-events: none; z-index: -1; transition: background 0.3s ease;
+        }
+
+        .glass {
+            background: var(--glass-panel);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.1);
+        }
+
+        /* SVG ИКОНКИ */
+        .icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .icon-sm { width: 16px; height: 16px; }
+        .icon-fill { fill: currentColor; stroke: none; }
+
+        /* УВЕДОМЛЕНИЯ */
+        #toast-container { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; width: 90%; max-width: 400px; align-items: center; }
+        .toast {
+            background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(10px);
+            border: 1px solid var(--theme-hex); color: #fff; font-size: 13px; font-weight: 600;
+            padding: 12px 20px; border-radius: 12px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.8), 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.6);
+            animation: toastSlideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, fadeOut 0.4s ease forwards 2.5s;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .toast.error { border-color: var(--danger); box-shadow: 0 8px 20px rgba(0,0,0,0.8), 0 0 calc(15px * var(--glow-int)) rgba(239, 68, 68, 0.5); }
+        @keyframes toastSlideDown { from { opacity: 0; transform: translateY(-20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px) scale(0.9); } }
+
+        /* ШАПКА */
+        header { 
+            padding: calc(env(safe-area-inset-top) + 12px) 15px 15px; 
+            border-radius: 0 0 24px 24px; border-top: none; border-left: none; border-right: none;
+            border-bottom: 1px solid rgba(var(--theme-rgb), calc(0.3 * var(--glow-int)));
+            box-shadow: 0 5px calc(25px * var(--glow-int)) rgba(var(--theme-rgb), 0.15);
+            z-index: 10; flex-shrink: 0; margin-bottom: 5px; background: var(--glass-panel);
+            backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .logo { font-size: 20px; font-weight: 800; color: var(--text-color); letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
+        
+        .logo svg { fill: none; stroke: var(--theme-hex); stroke-width: 2; filter: drop-shadow(0 0 calc(6px * var(--glow-int)) var(--theme-hex)); transition: 0.3s; }
+        .logo span { color: var(--theme-hex); text-shadow: 0 0 calc(15px * var(--glow-int)) var(--theme-hex); transition: 0.3s; }
+        .tools { display: flex; gap: 5px; }
+
+        /* ИНПУТЫ И КНОПКИ */
+        .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        .custom-input { 
+            background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); color: var(--text-color); 
+            padding: 10px 12px; border-radius: 10px; font-size: 13px; outline: none; transition: 0.3s ease; width: 100%;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
+        }
+        select.custom-input { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 10px top 50%; background-size: 10px auto; padding-right: 25px; }
+        .custom-input:focus { 
+            border-color: var(--theme-hex); background: rgba(0,0,0,0.8); 
+            box-shadow: inset 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.3), 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.2); 
+        }
+        
+        .action-btn { 
+            background: rgba(255,255,255,0.03); backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border); color: var(--text-color); border-radius: 10px; font-weight: 600; font-size: 12px; 
+            cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+            display: flex; align-items: center; justify-content: center; gap: 6px; text-transform: uppercase; padding: 10px;
+        }
+        .action-btn:active { transform: scale(0.95); background: rgba(var(--theme-rgb), 0.1); border-color: var(--theme-hex); box-shadow: 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
+        .btn-icon { padding: 8px; width: 38px; height: 38px; }
+        
+        .btn-main { 
+            background: rgba(0,0,0,0.4); border-color: rgba(var(--theme-rgb), 0.8); color: var(--text-color); 
+            box-shadow: inset 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.2), 0 4px 10px rgba(0,0,0,0.5); 
+            margin-top: 5px; text-shadow: 0 0 calc(5px * var(--glow-int)) var(--theme-hex); letter-spacing: 0.5px;
+        }
+        .btn-main:active { background: rgba(var(--theme-rgb), 0.2); box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.5), 0 0 calc(25px * var(--glow-int)) var(--theme-hex); }
+
+        /* БИБЛИОТЕКА */
+        #library-room {
+            position: fixed; inset: 0; background: var(--bg-base); z-index: 30000;
+            display: none; flex-direction: column; opacity: 0; transition: opacity 0.3s ease;
+        }
+        #library-room.show { opacity: 1; }
+        .lib-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top) + 20px) 20px 15px; border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
+        .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; padding: 20px; overflow-y: auto; flex: 1; }
+        
+        /* КАРТОЧКА КНИГИ И АНИМАЦИЯ ФИКС */
+        .book-card { 
+            background: rgba(255,255,255,0.05); border-radius: 12px; 
+            position: relative; transition: 0.3s; display: flex; flex-direction: column; 
+            overflow: hidden; padding: 2px; /* Место для неоновой змейки */
+        }
+        /* Статичная рамка */
+        .book-card::before { 
+            content: ''; position: absolute; inset: 0; border: 1px solid var(--glass-border); 
+            border-radius: 12px; pointer-events: none; z-index: 3; transition: 0.3s; 
+        }
+        /* Анимация скачивания: Вращающийся луч */
+        .book-card.downloading { background: transparent; }
+        .book-card.downloading::before { border-color: transparent; }
+        .book-card.downloading::after {
+            content: ''; position: absolute; 
+            top: 50%; left: 50%; width: 200%; height: 200%;
+            background: conic-gradient(from 0deg, transparent 70%, var(--theme-hex) 100%);
+            animation: spinBorder 1.5s linear infinite; z-index: 1;
+        }
+        /* Идеальный центр вращения */
+        @keyframes spinBorder { 
+            0% { transform: translate(-50%, -50%) rotate(0deg); } 
+            100% { transform: translate(-50%, -50%) rotate(360deg); } 
+        }
+        /* Завершение (Сплошное свечение) */
+        .book-card.downloaded { background: var(--theme-hex); box-shadow: 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
+        .book-card.downloaded::before { border-color: transparent; }
+
+        /* Внутренний контейнер карточки */
+        .book-content { background: var(--bg-base); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; height: 100%; z-index: 2; position: relative; }
+        .book-cover { width: 100%; aspect-ratio: 2/3; background: #0a0a0f; object-fit: cover; display: block; border-bottom: 1px solid var(--glass-border); }
+        .book-cover-placeholder { width: 100%; aspect-ratio: 2/3; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.1); border-bottom: 1px solid var(--glass-border); }
+        .book-info { padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+        .book-title { font-size: 12px; font-weight: 700; color: var(--text-color); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 2px; line-height: 1.3; }
+        .book-site { font-size: 9px; color: var(--theme-hex); text-transform: uppercase; letter-spacing: 0.5px; text-shadow: 0 0 calc(5px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
+        .book-actions { display: flex; gap: 5px; }
+        .book-btn { flex: 1; padding: 6px 0; font-size: 11px; border-radius: 8px; z-index: 3; }
+
+        /* НАСТРОЙКИ (МОДАЛКА) */
+        #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 20000; display: flex; justify-content: center; align-items: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(10px); }
+        #settings-modal.show { opacity: 1; pointer-events: auto; }
+        .settings-content { width: 100%; max-width: 360px; padding: 20px; border-radius: 20px; display: flex; flex-direction: column; gap: 12px; transform: scale(0.9) translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 1px solid var(--theme-hex); box-shadow: 0 20px 50px rgba(0,0,0,0.9), 0 0 calc(30px * var(--glow-int)) rgba(var(--theme-rgb), 0.3); max-height: 85vh; overflow-y: auto; }
+        #settings-modal.show .settings-content { transform: scale(1) translateY(0); }
+        .settings-header { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700; color: var(--text-color); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
+        .settings-section { background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 12px; border-radius: 12px; }
+
+        .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .setting-label { font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase; }
+        input[type="color"] { -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; padding: 0; background: none; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+        input[type="range"] { flex: 1; margin-left: 15px; accent-color: var(--theme-hex); }
+
+        /* ЧИТАЛКА */
+        main { flex: 1; overflow-y: auto; padding: 10px 15px 180px 15px; line-height: 1.7; font-size: 18px; scroll-behavior: smooth; position: relative; }
+        main::after { content: ''; position: fixed; bottom: 0; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, var(--bg-base)); pointer-events: none; z-index: 1; }
+        
+        .paragraph { margin-bottom: 20px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .sentence { cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; position: relative; }
+        .sentence.active { background: rgba(var(--theme-rgb), 0.2); color: var(--text-color); font-weight: 600; text-shadow: 0 0 calc(8px * var(--glow-int)) var(--theme-hex); display: inline-block; z-index: 2; border-bottom: 1px solid var(--theme-hex); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.3); }
+
+        /* ПЛЕЕР */
+        footer { 
+            position: fixed; bottom: calc(env(safe-area-inset-bottom) + 15px); left: 50%; transform: translateX(-50%); 
+            width: 94%; max-width: 450px; border-radius: 20px; padding: 12px 15px; z-index: 100; 
+        }
+        .progress-container { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 12px; overflow: hidden; cursor: pointer; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
+        #progress-fill { height: 100%; background: var(--theme-hex); width: 0%; transition: width 0.2s ease-out; box-shadow: 0 0 calc(10px * var(--glow-int)) var(--theme-hex); }
+        
+        .player-controls { display: flex; justify-content: space-between; align-items: center; }
+        .player-nav { display: flex; gap: 15px; align-items: center; }
+        
+        .play-btn { 
+            width: 52px; height: 52px; border-radius: 50%; background: rgba(var(--theme-rgb), 0.1); color: var(--text-color); 
+            border: 1px solid var(--theme-hex); 
+            box-shadow: inset 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.3), 0 4px calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.4); 
+            display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer;
+        }
+        .play-btn:active { transform: scale(0.9); background: rgba(var(--theme-rgb), 0.3); }
+        .play-btn svg { color: var(--theme-hex); filter: drop-shadow(0 0 calc(5px * var(--glow-int)) var(--theme-hex)); }
+        
+        .icon-btn { background: none; color: var(--text-color); border: none; padding: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; opacity: 0.7; cursor: pointer; transition: 0.2s; }
+        .icon-btn:active { opacity: 1; transform: scale(0.85); color: var(--theme-hex); filter: drop-shadow(0 0 calc(5px * var(--glow-int)) var(--theme-hex)); }
+        .info-text { font-size: 11px; color: var(--subtext); font-variant-numeric: tabular-nums; font-weight: 600; width: 35px; text-align: left; }
+    </style>
+</head>
+<body>
+
+<div id="bg-glow"></div>
+<div id="toast-container"></div>
+
+<div id="library-room">
+    <div class="lib-header">
+        <h2 style="font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px;">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            Библиотека
+        </h2>
+        <button class="action-btn btn-icon" onclick="app.toggleLibrary()" style="border-color:transparent; color:var(--text-color);">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    </div>
+    <div class="lib-grid" id="library-grid"></div>
+</div>
+
+<header class="glass">
+    <div class="header-top">
+        <div class="logo">
+            <svg class="icon" style="width:24px; height:24px;" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            Neon<span>Reader</span>
+        </div>
+        <div class="tools">
+            <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            </button>
+            <button class="action-btn btn-icon" onclick="app.toggleSettings()" title="Настройки">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+            <button class="action-btn btn-icon" onclick="app.toggleManual()" title="Ручной ввод">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="main-controls">
+        <div class="input-group">
+            <select id="site-select" class="custom-input" style="max-width: 110px;" onchange="app.updateSiteTemplate()">
+                <option value="novelbin">NovelBin</option>
+                <option value="freewebnovel">FreeWeb</option>
+                <option value="lightnovelpub">LightNovel</option>
+            </select>
+            <input type="url" id="url-input" class="custom-input" value="https://novelbin.com/b/raising-villains-the-right-way/chapter-178" placeholder="Ссылка на главу">
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button class="action-btn btn-main" style="flex: 1;" onclick="app.processChapter()">
+                <svg class="icon icon-sm icon-fill" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                ПЕРЕВЕСТИ
+            </button>
+            <button class="action-btn btn-icon" style="background: rgba(255,255,255,0.05);" onclick="app.addToLibraryCurrent()" title="Добавить в библиотеку">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="manual-panel" style="display: none;">
+        <textarea id="manual-input" class="custom-input" rows="4" placeholder="Вставь английский текст главы сюда..."></textarea>
+        <button class="action-btn btn-main" style="width: 100%; margin-top:8px;" onclick="app.processChapter()">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path></svg>
+            ПЕРЕВЕСТИ ТЕКСТ
+        </button>
+    </div>
+</header>
+
+<div id="settings-modal">
+    <div class="glass settings-content">
+        <div class="settings-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                Настройки Системы
+            </div>
+            <button class="icon-btn" onclick="app.toggleSettings()" style="width:30px;height:30px; opacity: 1;">
+                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        
+        <div class="settings-section">
+            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase; letter-spacing:1px;">Дизайн и Неон</div>
+            
+            <div class="setting-row">
+                <span class="setting-label">Цвет свечения</span>
+                <input type="color" id="cfg-theme" onchange="app.updateSettings()">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Цвет фона</span>
+                <input type="color" id="cfg-bg" onchange="app.updateSettings()">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Цвет текста</span>
+                <input type="color" id="cfg-text" onchange="app.updateSettings()">
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Сила неона</span>
+                <input type="range" id="cfg-glow" min="0" max="2" step="0.1" onchange="app.updateSettings()">
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase; letter-spacing:1px;">Звук (TTS)</div>
+            <select id="voice-engine-select" class="custom-input" style="padding: 8px 10px;">
+                <option value="alisa">Облачный: Алиса</option>
+                <option value="google">Нативный: Google TTS</option>
+                <option value="local">Локальный: Piper ONNX</option>
+            </select>
+            <div style="margin-top: 10px; display:flex; gap:5px;">
+                <input type="text" id="model-url" class="custom-input" placeholder="URL к .onnx" style="padding: 8px 10px;">
+                <button class="action-btn" style="padding: 8px; border: none;" onclick="app.downloadLocalModel()">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main id="reader-container">
+    <div style="text-align: center; color: var(--subtext); margin-top: 60px; font-weight: 500;">
+        <svg style="width:48px; height:48px; opacity:0.3; margin-bottom:10px; stroke:var(--theme-hex);" viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><br>
+        <span style="font-size: 14px;">Система ожидает текст...</span>
+    </div>
+</main>
+
+<footer class="glass">
+    <div class="progress-container" onclick="app.seekProgress(event)"><div id="progress-fill"></div></div>
+    <div class="player-controls">
+        <div style="display: flex; gap: 5px;">
+            <button class="icon-btn" onclick="app.saveBookmark()" title="Сохранить закладку">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            </button>
+            <button class="icon-btn" onclick="app.downloadMp3()" title="Скачать MP3">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+        </div>
+
+        <div class="player-nav">
+            <button class="icon-btn" onclick="app.jump(-1)">
+                <svg class="icon-fill" style="width:20px;height:20px;" viewBox="0 0 24 24"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
+            </button>
+            <button class="play-btn" id="play-btn" onclick="app.togglePlay()">
+                <svg class="icon-fill" style="width:22px;height:22px;margin-left:3px;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            <button class="icon-btn" onclick="app.jump(1)">
+                <svg class="icon-fill" style="width:20px;height:20px;" viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+            </button>
+        </div>
+
+        <div style="display: flex; gap: 5px; align-items: center;">
+            <div id="counter" style="font-size: 10px; color: var(--subtext); font-family: monospace; font-weight: bold; width: 30px; text-align: right;">0/0</div>
+            <button class="icon-btn" onclick="app.nextChapter()" title="Следующая глава">
+                <svg class="icon-fill" style="width:14px;height:14px; color:var(--text-color);" viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+            </button>
+        </div>
+    </div>
+</footer>
+
+<script>
+// --- ИНИЦИАЛИЗАЦИЯ ЛОКАЛЬНОЙ БАЗЫ NeonDB ---
+const NeonDB = {
+    db: null,
+    async init() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open("NeonReaderDB", 1);
+            req.onupgradeneeded = (e) => {
+                this.db = e.target.result;
+                if (!this.db.objectStoreNames.contains("chapters")) {
+                    this.db.createObjectStore("chapters", { keyPath: "url" });
+                }
+            };
+            req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+            req.onerror = (e) => reject(e);
+        });
+    },
+    async saveChapter(url, bookId, text, nextUrl) {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction("chapters", "readwrite");
+            tx.objectStore("chapters").put({ url, bookId, text, nextUrl });
+            tx.oncomplete = () => resolve();
+        });
+    },
+    async getChapter(url) {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction("chapters", "readonly");
+            const req = tx.objectStore("chapters").get(url);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+    },
+    async deleteBookChapters(bookId) {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction("chapters", "readwrite");
+            const store = tx.objectStore("chapters");
+            const req = store.openCursor();
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    if (cursor.value.bookId === bookId) cursor.delete();
+                    cursor.continue();
+                } else resolve();
+            };
+        });
+    }
+};
+
+const app = {
+    sents: [], currentIndex: -1, isPlaying: false,
+    audio: new Audio(), nextUrl: null,
+    yKey: "069b6659-984b-4c5f-880e-aaedcfd84102",
+    manualMode: false, library: [], voices: [], sites: [],
+    settingsOpen: false, libOpen: false,
+    currentBookMetadata: { title: '', cover: '' },
+    activeDownloads: {},
+
+    async init() {
+        await NeonDB.init();
+        this.loadSettings();
+        this.loadSitesData();
+        this.loadLibraryData();
+        
+        const loadVoices = () => { this.voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('ru')); };
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+        
+        this.audio.onended = () => {
+            if(this.audio.src.includes('blob:')) URL.revokeObjectURL(this.audio.src);
+            this.jump(1);
+        };
+    },
+
+    toast(msg, type = 'ok') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        const icon = type === 'error' ? 
+            `<svg class="icon icon-sm" style="color:var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>` : 
+            `<svg class="icon icon-sm" style="color:var(--theme-hex);" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        toast.innerHTML = `${icon} <span>${msg}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+    },
+
+    // --- УПРАВЛЕНИЕ ДИЗАЙНОМ (RGB) ---
+    hexToRgb(hex) {
+        let bigint = parseInt(hex.replace('#',''), 16);
+        return `${(bigint >> 16) & 255}, ${(bigint >> 8) & 255}, ${bigint & 255}`;
+    },
+
+    loadSettings() {
+        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', text: '#f1f5f9', glow: 1 };
+        document.getElementById('cfg-theme').value = conf.theme;
+        document.getElementById('cfg-bg').value = conf.bg;
+        document.getElementById('cfg-text').value = conf.text;
+        document.getElementById('cfg-glow').value = conf.glow;
+        this.applySettingsUI(conf);
+    },
+
+    updateSettings() {
+        const conf = {
+            theme: document.getElementById('cfg-theme').value,
+            bg: document.getElementById('cfg-bg').value,
+            text: document.getElementById('cfg-text').value,
+            glow: document.getElementById('cfg-glow').value
+        };
+        localStorage.setItem('neon_custom_ui', JSON.stringify(conf));
+        this.applySettingsUI(conf);
+    },
+
+    applySettingsUI(conf) {
+        const root = document.documentElement;
+        root.style.setProperty('--theme-hex', conf.theme);
+        root.style.setProperty('--theme-rgb', this.hexToRgb(conf.theme));
+        root.style.setProperty('--bg-base', conf.bg);
+        root.style.setProperty('--text-color', conf.text);
+        root.style.setProperty('--glow-int', conf.glow);
+    },
+
+    toggleSettings() {
+        const modal = document.getElementById('settings-modal');
+        if (this.settingsOpen) { modal.classList.remove('show'); setTimeout(() => modal.style.display = 'none', 300); } 
+        else { modal.style.display = 'flex'; setTimeout(() => modal.classList.add('show'), 10); }
+        this.settingsOpen = !this.settingsOpen;
+    },
+
+    toggleLibrary() {
+        const room = document.getElementById('library-room');
+        if (this.libOpen) { room.classList.remove('show'); setTimeout(() => room.style.display = 'none', 300); } 
+        else { this.renderLibraryGrid(); room.style.display = 'flex'; setTimeout(() => room.classList.add('show'), 10); }
+        this.libOpen = !this.libOpen;
+    },
+
+    loadSitesData() {
+        const defaultSites = [
+            { id: 'novelbin', name: 'NovelBin' },
+            { id: 'freewebnovel', name: 'FreeWeb' },
+            { id: 'lightnovelpub', name: 'LightNovel' }
+        ];
+        this.sites = JSON.parse(localStorage.getItem('neon_custom_sites')) || defaultSites;
+        const select = document.getElementById('site-select');
+        select.innerHTML = '';
+        this.sites.forEach(s => select.add(new Option(s.name, s.id)));
+    },
+
+    ensureSiteInList(urlStr) {
+        try {
+            const urlObj = new URL(urlStr);
+            const domain = urlObj.hostname.replace('www.', '').split('.')[0];
+            const exists = this.sites.find(s => s.id === domain);
+            if (!exists) {
+                const name = domain.charAt(0).toUpperCase() + domain.slice(1);
+                this.sites.push({ id: domain, name: name });
+                localStorage.setItem('neon_custom_sites', JSON.stringify(this.sites));
+                this.loadSitesData();
+            }
+            document.getElementById('site-select').value = domain;
+        } catch(e) {}
+    },
+
+    updateSiteTemplate() {
+        const site = document.getElementById('site-select').value;
+        const input = document.getElementById('url-input');
+        if(site === 'novelbin') input.value = 'https://novelbin.com/b/';
+        else if(site === 'freewebnovel') input.value = 'https://freewebnovel.com/';
+        else if(site === 'lightnovelpub') input.value = 'https://www.lightnovelpub.vip/novel/';
+        else input.value = `https://${site}.com/`;
+    },
+
+    // --- БИБЛИОТЕКА И ОФФЛАЙН ЗАГРУЗКА ---
+    loadLibraryData() { this.library = JSON.parse(localStorage.getItem('neon_books_db')) || []; },
+    saveLibraryData() { localStorage.setItem('neon_books_db', JSON.stringify(this.library)); this.renderLibraryGrid(); },
+
+    addToLibraryCurrent() {
+        const url = document.getElementById('url-input').value;
+        if(!url || url.length < 15) return this.toast('Введите ссылку!', 'error');
+        const domain = new URL(url).hostname.replace('www.', '').split('.')[0];
+        let title = this.currentBookMetadata.title || url.split('/').filter(Boolean).pop().replace(/-/g, ' ');
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+        const newBook = { id: Date.now().toString(), title: title, url: url, site: domain, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, isDownloaded: false };
+        this.library.push(newBook);
+        this.saveLibraryData();
+        this.toast("Сохранено в Библиотеку!", "ok");
+    },
+
+    renderLibraryGrid() {
+        const grid = document.getElementById('library-grid');
+        grid.innerHTML = '';
+        if(this.library.length === 0) { grid.innerHTML = '<div style="color:var(--subtext); text-align:center; width:100%; grid-column: 1 / -1; margin-top:50px; font-size:14px;">Библиотека пуста. Добавьте книгу с главного экрана.</div>'; return; }
+
+        this.library.forEach(book => {
+            const card = document.createElement('div');
+            card.className = `book-card ${book.isDownloading ? 'downloading' : (book.isDownloaded ? 'downloaded' : '')}`;
+            
+            const coverIcon = `<svg class="icon" style="width:30px;height:30px;stroke:var(--glass-border);" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
+            const coverHtml = book.coverUrl ? `<img src="${book.coverUrl}" class="book-cover" onerror="this.outerHTML='<div class=\\'book-cover-placeholder\\'>${coverIcon}</div>'">` : `<div class="book-cover-placeholder">${coverIcon}</div>`;
+            
+            let btnAction = '';
+            if (book.isDownloading) btnAction = `<button class="action-btn book-btn" style="color:var(--danger);" onclick="app.stopDownload('${book.id}')" title="Остановить"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg></button>`;
+            else if (book.isDownloaded) btnAction = `<button class="action-btn book-btn" style="color:var(--danger);" onclick="app.deleteDownload('${book.id}')" title="Удалить кэш"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
+            else btnAction = `<button class="action-btn book-btn" style="color:var(--theme-hex);" onclick="app.startDownload('${book.id}')" title="Скачать всё"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>`;
+
+            card.innerHTML = `
+                <div class="book-content">
+                    ${coverHtml}
+                    <div class="book-info">
+                        <div>
+                            <div class="book-site">${book.site}</div>
+                            <div class="book-title">${book.title}</div>
+                        </div>
+                        <div class="book-actions">
+                            <button class="action-btn book-btn" style="flex:2;" onclick="app.loadBookFromLib('${book.id}')">
+                                <svg class="icon icon-sm icon-fill" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            </button>
+                            <button class="action-btn book-btn" onclick="app.editBook('${book.id}')" title="Редактировать">
+                                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                            </button>
+                            ${btnAction}
+                        </div>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    },
+
+    loadBookFromLib(id) {
+        const book = this.library.find(b => b.id === id);
+        if(book) { document.getElementById('url-input').value = book.url; this.toggleLibrary(); this.processChapter(); }
+    },
+
+    editBook(id) {
+        const book = this.library.find(b => b.id === id);
+        if(book) {
+            const newTitle = prompt("Название книги:", book.title);
+            if(newTitle !== null) book.title = newTitle;
+            const newCover = prompt("Ссылка на обложку (URL картинки):", book.coverUrl);
+            if(newCover !== null) book.coverUrl = newCover;
+            this.saveLibraryData();
+        }
+    },
+
+    // --- ФОНОВЫЙ ПАРСЕР КНИГ ---
+    async networkFetchCore(url, site) {
+        const proxies = [`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, `https://corsproxy.io/?${encodeURIComponent(url)}`];
+        let html = "";
+        for (let p of proxies) { try { const r = await fetch(p); if (r.ok) { html = await r.text(); break; } } catch(e) {} }
+        if (!html || html.includes("Cloudflare")) throw new Error("Защита Cloudflare");
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        let sel = 'p';
+        if (site === 'novelbin') sel = '.chr-c p, #chr-content p';
+        else if (site === 'freewebnovel') sel = '.txt p, .article-content p';
+        else if (site === 'lightnovelpub') sel = '#chapter-container p, .chapter-content p';
+        else sel = 'p, div.text, div.content, .chapter-content p'; 
+
+        let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(t => t.length > 20);
+        if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t.length > 30);
+        if (paras.length < 3) throw new Error("Текст не найден");
+
+        let nUrl = null;
+        Array.from(doc.querySelectorAll('a')).forEach(a => {
+            const text = a.innerText.toLowerCase();
+            if (text.includes('next') || text.includes('следующая')) {
+                const href = a.getAttribute('href');
+                if (href && href !== '#') nUrl = new URL(href, url).href;
+            }
+        });
+        
+        return { text: paras.join('\n\n'), nextUrl: nUrl, title: doc.querySelector('title')?.innerText || "", cover: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || "" };
+    },
+
+    async startDownload(id) {
+        let book = this.library.find(b => b.id === id);
+        if (!book || book.isDownloaded) return;
+        
+        book.isDownloading = true; this.activeDownloads[id] = true; this.saveLibraryData();
+        this.toast(`Фоновая загрузка: ${book.title}`, "ok");
+
+        let curUrl = book.url;
+        let count = 0;
+
+        while(curUrl && this.activeDownloads[id]) {
+            let existing = await NeonDB.getChapter(curUrl);
+            if (existing) { curUrl = existing.nextUrl; } 
+            else {
+                try {
+                    let data = await this.networkFetchCore(curUrl, book.site);
+                    await NeonDB.saveChapter(curUrl, id, data.text, data.nextUrl);
+                    curUrl = data.nextUrl; count++;
+                    await new Promise(r => setTimeout(r, 1500)); 
+                } catch(e) {
+                    this.toast(`Сбой скачивания.`, "error"); break;
+                }
+            }
+        }
+        
+        if (this.activeDownloads[id]) { 
+            book.isDownloading = false; book.isDownloaded = true; this.activeDownloads[id] = false;
+            this.saveLibraryData(); this.toast(`Скачано в оффлайн кэш!`, "ok");
+        }
+    },
+
+    stopDownload(id) {
+        this.activeDownloads[id] = false;
+        let book = this.library.find(b => b.id === id);
+        if(book) { book.isDownloading = false; this.saveLibraryData(); this.toast("Загрузка прервана.", "ok"); }
+    },
+
+    async deleteDownload(id) {
+        if(confirm("Удалить скачанные главы из памяти телефона?")) {
+            await NeonDB.deleteBookChapters(id);
+            let book = this.library.find(b => b.id === id);
+            if(book) { book.isDownloaded = false; this.saveLibraryData(); this.toast("Удалено.", "ok"); }
+        }
+    },
+
+    // --- ПАРСИНГ ДЛЯ ЧТЕНИЯ (ONLINE/OFFLINE) ---
+    toggleManual() {
+        this.manualMode = !this.manualMode;
+        document.getElementById('manual-panel').style.display = this.manualMode ? 'block' : 'none';
+        document.getElementById('main-controls').style.display = this.manualMode ? 'none' : 'block';
+    },
+
+    async processChapter() {
+        this.stop();
+        this.audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+        this.audio.play().catch(()=>{});
+
+        let rawText = "";
+        this.currentBookMetadata = { title: '', cover: '' };
+
+        if (this.manualMode) {
+            rawText = document.getElementById('manual-input').value.trim();
+            if (rawText.length < 50) return this.toast("Текст слишком короткий!", "error");
+        } else {
+            const url = document.getElementById('url-input').value;
+            this.ensureSiteInList(url); 
+            const site = document.getElementById('site-select').value;
+            
+            // 1. Проверяем локальную базу (ОФФЛАЙН)
+            const dbData = await NeonDB.getChapter(url);
+            if (dbData) {
+                this.toast("Извлечено из оффлайн кэша", "ok");
+                rawText = dbData.text;
+                this.nextUrl = dbData.nextUrl;
+            } else {
+                // 2. Идем в интернет (ОНЛАЙН)
+                this.toast("Стучимся на сайт...", "ok");
+                try {
+                    const data = await this.networkFetchCore(url, site);
+                    rawText = data.text;
+                    this.nextUrl = data.nextUrl;
+                    this.currentBookMetadata.title = data.title;
+                    this.currentBookMetadata.cover = data.cover;
+                } catch (e) { return this.toast(e.message, "error"); }
+            }
+        }
+
+        this.toast("Нейроперевод...", "ok");
+        try {
+            const translatedText = await this.translate(rawText);
+            this.render(translatedText);
+            this.toast("Готово. Нажми Play", "ok");
+        } catch (e) { this.toast("Сбой перевода.", "error"); }
+    },
+
+    async translate(text) {
+        const chunks = text.match(/[\s\S]{1,1500}(?=\n\n|$)/g) || [text];
+        let result = "";
+        for (let i = 0; i < chunks.length; i++) {
+            const tUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&q=${encodeURIComponent(chunks[i])}`;
+            const r = await fetch(tUrl); const d = await r.json();
+            result += d[0].map(x => x[0]).join('') + "\n\n";
+            await new Promise(ok => setTimeout(ok, 350));
+        }
+        return result;
+    },
+
+    render(text) {
+        const container = document.getElementById('reader-container');
+        container.innerHTML = '';
+        this.sents = [];
+        text.split('\n\n').forEach((p, pIdx) => {
+            if (!p.trim()) return;
+            const pDiv = document.createElement('div');
+            pDiv.className = 'paragraph'; pDiv.style.animationDelay = `${pIdx * 0.05}s`;
+            const parts = p.match(/[^.!?]+[.!?]+/g) || [p];
+            parts.forEach(s => {
+                const gIdx = this.sents.length;
+                const span = document.createElement('span'); span.className = 'sentence'; span.id = 's-' + gIdx;
+                span.innerText = s + " "; span.onclick = () => this.play(gIdx);
+                this.sents.push(s.trim()); pDiv.appendChild(span);
+            });
+            container.appendChild(pDiv);
+        });
+        this.currentIndex = -1; this.updateUI();
+    },
+
+    downloadLocalModel() { this.toast("Загрузка .onnx требует интеграции WASM.", "ok"); },
+
+    // --- ПЛЕЕР И АУДИО ---
+    async play(index) {
+        if (index < 0 || index >= this.sents.length) return this.stop();
+        this.currentIndex = index; this.updateUI();
+        const voice = document.getElementById('voice-engine-select').value;
+        const text = this.sents[index];
+        if (voice === 'google') this.playGoogle(text);
+        else if (voice === 'local') this.toast("Локальный движок не интегрирован.", "error");
+        else await this.playAlisa(text);
+    },
+
+    playGoogle(text) {
+        window.speechSynthesis.cancel();
+        const utt = new SpeechSynthesisUtterance(text); utt.lang = 'ru-RU';
+        if (this.voices.length > 0) utt.voice = this.voices.find(v => v.name.includes('Google') || v.name.includes('ru-RU')) || this.voices[0];
+        utt.onend = () => { if (this.isPlaying) this.jump(1); };
+        window.speechSynthesis.speak(utt);
+        this.isPlaying = true; this.updateUI();
+    },
+
+    async playAlisa(text) {
+        const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=1.0`;
+        try { this.audio.src = ttsUrl; await this.audio.play(); this.isPlaying = true; this.updateUI(); } 
+        catch (e) {
+            try {
+                const proxies = [`https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`, `https://corsproxy.io/?${encodeURIComponent(ttsUrl)}`];
+                let success = false;
+                for (let p of proxies) {
+                    try { const res = await fetch(p); if (res.ok) { const blob = await res.blob(); if (blob.size > 1000) { this.audio.src = URL.createObjectURL(blob); await this.audio.play(); success = true; break; } } } catch (err) {}
+                }
+                if (!success) throw new Error();
+                this.isPlaying = true; this.updateUI();
+            } catch (err) {
+                this.toast("Яндекс отказ. Включен Google.", "error");
+                document.getElementById('voice-engine-select').value = 'google';
+                this.playGoogle(text);
+            }
+        }
+    },
+
+    togglePlay() {
+        if (!this.sents.length) return this.toast("Сначала загрузи главу!", "error");
+        if (this.isPlaying) { this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; } 
+        else { this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); }
+        this.updateUI();
+    },
+
+    stop() { this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; this.updateUI(); },
+    jump(delta) { this.play(this.currentIndex + delta); },
+    seekProgress(e) { if(!this.sents.length) return; const rect = e.currentTarget.getBoundingClientRect(); this.play(Math.floor(this.sents.length * ((e.clientX - rect.left) / rect.width))); },
+
+    saveBookmark() {
+        if (this.currentIndex === -1) return this.toast("Нечего сохранять!", "error");
+        const data = { url: document.getElementById('url-input').value, index: this.currentIndex };
+        localStorage.setItem('neon_pro_save', JSON.stringify(data));
+        this.toast("Закладка сохранена!", "ok");
+    },
+    async loadBookmark() {
+        const data = JSON.parse(localStorage.getItem('neon_pro_save'));
+        if (!data) return this.toast("Нет закладок.", "error");
+        this.manualMode = false; document.getElementById('manual-panel').style.display = 'none'; document.getElementById('main-controls').style.display = 'block';
+        document.getElementById('url-input').value = data.url;
+        await this.processChapter(); setTimeout(() => this.play(data.index), 1000);
+    },
+
+    downloadMp3() { if (this.currentIndex !== -1 && this.audio.src && !this.audio.src.includes('data:audio')) window.open(this.audio.src); else this.toast("MP3 недоступен.", "error"); },
+    nextChapter() { if (this.nextUrl) { document.getElementById('url-input').value = this.nextUrl; this.processChapter(); } else this.toast("Ссылка не найдена.", "error"); },
+
+    updateUI() {
+        const iconPlay = `<svg class="icon-fill" style="width:22px;height:22px;margin-left:3px;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+        const iconPause = `<svg class="icon-fill" style="width:18px;height:18px;" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+        document.getElementById('play-btn').innerHTML = this.isPlaying ? iconPause : iconPlay;
+            
+        document.querySelectorAll('.sentence').forEach(el => el.classList.remove('active'));
+        const activeEl = document.getElementById('s-' + this.currentIndex);
+        if (activeEl) {
+            activeEl.classList.add('active');
+            activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('progress-fill').style.width = (((this.currentIndex + 1) / this.sents.length) * 100) + "%";
+            document.getElementById('counter').innerText = `${this.currentIndex + 1}/${this.sents.length}`;
+        }
+    }
+};
+
+window.onload = () => app.init();
+</script>
+</body>
+</html>
