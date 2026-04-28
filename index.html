@@ -6,7 +6,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="referrer" content="no-referrer">
-    <title>NeonReader: Custom Cyberpunk</title>
+    <title>NeonReader: Ultimate Cyberpunk Core</title>
+    <script src="ort.min.js"></script>
     <style>
         :root {
             --bg-base: #0a0a0f;
@@ -18,6 +19,7 @@
             --glass-panel: rgba(15, 15, 22, 0.75);
             --glass-border: rgba(255, 255, 255, 0.08);
             --danger: #ef4444;
+            --success: #10b981;
             --subtext: rgba(255, 255, 255, 0.5);
             --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
@@ -31,7 +33,6 @@
             position: relative; transition: background-color 0.3s, color 0.3s;
         }
         
-        /* ДИНАМИЧЕСКИЙ НЕОНОВЫЙ ФОН */
         #bg-glow {
             position: absolute; top: 0; left: 0; right: 0; height: 70vh;
             background: radial-gradient(ellipse at 50% -10%, rgba(var(--theme-rgb), calc(0.25 * var(--glow-int))) 0%, transparent 70%);
@@ -46,26 +47,25 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.1);
         }
 
-        /* SVG ИКОНКИ */
         .icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .icon-sm { width: 16px; height: 16px; }
         .icon-fill { fill: currentColor; stroke: none; }
 
-        /* УВЕДОМЛЕНИЯ */
-        #toast-container { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; width: 90%; max-width: 400px; align-items: center; }
+        #toast-container { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 400px; align-items: center; pointer-events: none; }
         .toast {
             background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(10px);
             border: 1px solid var(--theme-hex); color: #fff; font-size: 13px; font-weight: 600;
-            padding: 12px 20px; border-radius: 12px; 
+            padding: 12px 20px; border-radius: 12px; pointer-events: auto;
             box-shadow: 0 8px 20px rgba(0,0,0,0.8), 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.6);
-            animation: toastSlideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, fadeOut 0.4s ease forwards 2.5s;
-            display: flex; align-items: center; gap: 10px;
+            animation: toastSlideDown 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; width: max-content; max-width: 100%;
         }
         .toast.error { border-color: var(--danger); box-shadow: 0 8px 20px rgba(0,0,0,0.8), 0 0 calc(15px * var(--glow-int)) rgba(239, 68, 68, 0.5); }
+        .toast.fadeOut { animation: fadeOut 0.3s ease forwards; }
+        .toast-close { background: none; border: none; color: var(--subtext); cursor: pointer; padding: 4px; display: flex; align-items: center; }
         @keyframes toastSlideDown { from { opacity: 0; transform: translateY(-20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px) scale(0.9); } }
 
-        /* ШАПКА */
         header { 
             padding: calc(env(safe-area-inset-top) + 12px) 15px 15px; 
             border-radius: 0 0 24px 24px; border-top: none; border-left: none; border-right: none;
@@ -76,12 +76,10 @@
         }
         .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .logo { font-size: 20px; font-weight: 800; color: var(--text-color); letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
-        
         .logo svg { fill: none; stroke: var(--theme-hex); stroke-width: 2; filter: drop-shadow(0 0 calc(6px * var(--glow-int)) var(--theme-hex)); transition: 0.3s; }
         .logo span { color: var(--theme-hex); text-shadow: 0 0 calc(15px * var(--glow-int)) var(--theme-hex); transition: 0.3s; }
         .tools { display: flex; gap: 5px; }
 
-        /* ИНПУТЫ И КНОПКИ */
         .input-group { display: flex; gap: 8px; margin-bottom: 10px; }
         .custom-input { 
             background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); color: var(--text-color); 
@@ -89,10 +87,7 @@
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.6);
         }
         select.custom-input { appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 10px top 50%; background-size: 10px auto; padding-right: 25px; }
-        .custom-input:focus { 
-            border-color: var(--theme-hex); background: rgba(0,0,0,0.8); 
-            box-shadow: inset 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.3), 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.2); 
-        }
+        .custom-input:focus { border-color: var(--theme-hex); background: rgba(0,0,0,0.8); box-shadow: inset 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.3), 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.2); }
         
         .action-btn { 
             background: rgba(255,255,255,0.03); backdrop-filter: blur(10px);
@@ -104,63 +99,29 @@
         .btn-icon { padding: 8px; width: 38px; height: 38px; }
         
         .btn-main { 
-            background: rgba(0,0,0,0.4); border-color: rgba(var(--theme-rgb), 0.8); color: var(--text-color); 
-            box-shadow: inset 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.2), 0 4px 10px rgba(0,0,0,0.5); 
-            margin-top: 5px; text-shadow: 0 0 calc(5px * var(--glow-int)) var(--theme-hex); letter-spacing: 0.5px;
+            background: rgba(var(--theme-rgb), 0.15); border-color: rgba(var(--theme-rgb), 0.8); color: var(--text-color); 
+            box-shadow: inset 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.3), 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.4); 
+            margin-top: 5px; text-shadow: 0 0 calc(5px * var(--glow-int)) var(--theme-hex);
         }
-        .btn-main:active { background: rgba(var(--theme-rgb), 0.2); box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.5), 0 0 calc(25px * var(--glow-int)) var(--theme-hex); }
+        .btn-main:active { background: rgba(var(--theme-rgb), 0.3); opacity: 1; box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.5), 0 0 calc(25px * var(--glow-int)) var(--theme-hex); }
 
-        /* БИБЛИОТЕКА */
-        #library-room {
-            position: fixed; inset: 0; background: var(--bg-base); z-index: 30000;
-            display: none; flex-direction: column; opacity: 0; transition: opacity 0.3s ease;
-        }
-        #library-room.show { opacity: 1; }
+        #library-room { position: fixed; inset: 0; background: var(--bg-base); z-index: 30000; display: none; flex-direction: column; opacity: 0; transition: opacity 0.3s ease; }
+        #library-room.show { opacity: 1; display: flex; }
         .lib-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top) + 20px) 20px 15px; border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
-        .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; padding: 20px; overflow-y: auto; flex: 1; }
         
-        /* КАРТОЧКА КНИГИ И АНИМАЦИЯ ФИКС */
-        .book-card { 
-            background: rgba(255,255,255,0.05); border-radius: 12px; 
-            position: relative; transition: 0.3s; display: flex; flex-direction: column; 
-            overflow: hidden; padding: 2px; /* Место для неоновой змейки */
-        }
-        /* Статичная рамка */
-        .book-card::before { 
-            content: ''; position: absolute; inset: 0; border: 1px solid var(--glass-border); 
-            border-radius: 12px; pointer-events: none; z-index: 3; transition: 0.3s; 
-        }
-        /* Анимация скачивания: Вращающийся луч */
-        .book-card.downloading { background: transparent; }
-        .book-card.downloading::before { border-color: transparent; }
-        .book-card.downloading::after {
-            content: ''; position: absolute; 
-            top: 50%; left: 50%; width: 200%; height: 200%;
-            background: conic-gradient(from 0deg, transparent 70%, var(--theme-hex) 100%);
-            animation: spinBorder 1.5s linear infinite; z-index: 1;
-        }
-        /* Идеальный центр вращения */
-        @keyframes spinBorder { 
-            0% { transform: translate(-50%, -50%) rotate(0deg); } 
-            100% { transform: translate(-50%, -50%) rotate(360deg); } 
-        }
-        /* Завершение (Сплошное свечение) */
-        .book-card.downloaded { background: var(--theme-hex); box-shadow: 0 0 calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
-        .book-card.downloaded::before { border-color: transparent; }
+        /* ОБНОВЛЕННАЯ БИБЛИОТЕКА */
+        .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 20px; overflow-y: auto; flex: 1; }
+        .book-card { background: rgba(255,255,255,0.03); border-radius: 20px; position: relative; transition: 0.3s; display: flex; flex-direction: column; height: 360px; border: 1px solid var(--glass-border); overflow: hidden; }
+        .book-card.downloading { border-color: var(--theme-hex); box-shadow: 0 0 25px rgba(var(--theme-rgb), 0.4); }
+        .book-card.downloaded { border-color: var(--theme-hex); }
+        .book-content { display: flex; flex-direction: column; height: 100%; }
+        .book-cover { width: 100%; height: 240px; object-fit: cover; background: #000; transition: 0.5s; }
+        .book-card:hover .book-cover { transform: scale(1.05); }
+        .download-badge { position: absolute; top: 12px; right: 12px; background: var(--theme-hex); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 900; z-index: 5; box-shadow: 0 0 15px rgba(0,0,0,0.5); display: none; }
+        .book-card.downloading .download-badge { display: block; }
 
-        /* Внутренний контейнер карточки */
-        .book-content { background: var(--bg-base); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; height: 100%; z-index: 2; position: relative; }
-        .book-cover { width: 100%; aspect-ratio: 2/3; background: #0a0a0f; object-fit: cover; display: block; border-bottom: 1px solid var(--glass-border); }
-        .book-cover-placeholder { width: 100%; aspect-ratio: 2/3; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.1); border-bottom: 1px solid var(--glass-border); }
-        .book-info { padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
-        .book-title { font-size: 12px; font-weight: 700; color: var(--text-color); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 2px; line-height: 1.3; }
-        .book-site { font-size: 9px; color: var(--theme-hex); text-transform: uppercase; letter-spacing: 0.5px; text-shadow: 0 0 calc(5px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
-        .book-actions { display: flex; gap: 5px; }
-        .book-btn { flex: 1; padding: 6px 0; font-size: 11px; border-radius: 8px; z-index: 3; }
-
-        /* НАСТРОЙКИ (МОДАЛКА) */
-        #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 20000; display: flex; justify-content: center; align-items: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(10px); }
-        #settings-modal.show { opacity: 1; pointer-events: auto; }
+        #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 20000; display: none; justify-content: center; align-items: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(10px); }
+        #settings-modal.show { opacity: 1; pointer-events: auto; display: flex; }
         .settings-content { width: 100%; max-width: 360px; padding: 20px; border-radius: 20px; display: flex; flex-direction: column; gap: 12px; transform: scale(0.9) translateY(10px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); border: 1px solid var(--theme-hex); box-shadow: 0 20px 50px rgba(0,0,0,0.9), 0 0 calc(30px * var(--glow-int)) rgba(var(--theme-rgb), 0.3); max-height: 85vh; overflow-y: auto; }
         #settings-modal.show .settings-content { transform: scale(1) translateY(0); }
         .settings-header { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700; color: var(--text-color); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
@@ -173,7 +134,6 @@
         input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
         input[type="range"] { flex: 1; margin-left: 15px; accent-color: var(--theme-hex); }
 
-        /* ЧИТАЛКА */
         main { flex: 1; overflow-y: auto; padding: 10px 15px 180px 15px; line-height: 1.7; font-size: 18px; scroll-behavior: smooth; position: relative; }
         main::after { content: ''; position: fixed; bottom: 0; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, var(--bg-base)); pointer-events: none; z-index: 1; }
         
@@ -182,7 +142,6 @@
         .sentence { cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; position: relative; }
         .sentence.active { background: rgba(var(--theme-rgb), 0.2); color: var(--text-color); font-weight: 600; text-shadow: 0 0 calc(8px * var(--glow-int)) var(--theme-hex); display: inline-block; z-index: 2; border-bottom: 1px solid var(--theme-hex); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.3); }
 
-        /* ПЛЕЕР */
         footer { 
             position: fixed; bottom: calc(env(safe-area-inset-bottom) + 15px); left: 50%; transform: translateX(-50%); 
             width: 94%; max-width: 450px; border-radius: 20px; padding: 12px 15px; z-index: 100; 
@@ -205,12 +164,42 @@
         .icon-btn { background: none; color: var(--text-color); border: none; padding: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; opacity: 0.7; cursor: pointer; transition: 0.2s; }
         .icon-btn:active { opacity: 1; transform: scale(0.85); color: var(--theme-hex); filter: drop-shadow(0 0 calc(5px * var(--glow-int)) var(--theme-hex)); }
         .info-text { font-size: 11px; color: var(--subtext); font-variant-numeric: tabular-nums; font-weight: 600; width: 35px; text-align: left; }
+
+        #captcha-modal {
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.95); 
+            z-index: 99999; 
+            flex-direction: column; 
+            padding: calc(env(safe-area-inset-top) + 20px) 15px 20px 15px;
+            backdrop-filter: blur(15px);
+        }
+        .captcha-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
+        .captcha-title { color:var(--theme-hex); font-size: 15px; display:flex; align-items:center; gap:8px; font-weight:bold; text-shadow: 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
+        .captcha-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); border:1px solid var(--glass-border); border-radius:12px; padding:20px; text-align:center; box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
     </style>
 </head>
 <body>
 
 <div id="bg-glow"></div>
 <div id="toast-container"></div>
+
+<div id="captcha-modal">
+    <div class="captcha-header">
+        <div class="captcha-title">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Защита от ботов
+        </div>
+        <button class="action-btn btn-main" onclick="app.closeCaptchaAndRetry()" style="padding: 8px 15px; border-radius: 8px; border:1px solid var(--success); color:var(--success);">Я прошел проверку</button>
+    </div>
+    <div class="captcha-body">
+        <div style="font-size:40px; margin-bottom:15px; filter: drop-shadow(0 0 10px var(--theme-hex));">🛡️</div>
+        <h3 style="color:var(--text-color); margin-bottom:10px;">Анти-бот защита сайта</h3>
+        <p style="color:var(--subtext); font-size:14px; margin-bottom:25px; line-height:1.5;">Нажмите кнопку ниже, чтобы открыть страницу.<br>Пройдите проверку "Я человек", закройте окно и нажмите кнопку завершения сверху.</p>
+        <button class="action-btn btn-main" style="padding:15px 30px; font-size:14px; box-shadow: 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.5);" onclick="app.openBypassBrowser()">ОТКРЫТЬ СТРАНИЦУ</button>
+    </div>
+</div>
 
 <div id="library-room">
     <div class="lib-header">
@@ -235,41 +224,31 @@
             <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             </button>
-            <button class="action-btn btn-icon" onclick="app.toggleSettings()" title="Настройки">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </button>
-            <button class="action-btn btn-icon" onclick="app.toggleManual()" title="Ручной ввод">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <button class="action-btn btn-icon" onclick="app.toggleSettings()" title="Настройки Контроля">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
         </div>
     </div>
 
     <div id="main-controls">
         <div class="input-group">
-            <select id="site-select" class="custom-input" style="max-width: 110px;" onchange="app.updateSiteTemplate()">
-                <option value="novelbin">NovelBin</option>
-                <option value="freewebnovel">FreeWeb</option>
-                <option value="lightnovelpub">LightNovel</option>
-            </select>
-            <input type="url" id="url-input" class="custom-input" value="https://novelbin.com/b/raising-villains-the-right-way/chapter-178" placeholder="Ссылка на главу">
+            <select id="site-select" class="custom-input" style="max-width: 100px;" onchange="app.updateSiteTemplate()"></select>
+            <input type="url" id="url-input" class="custom-input" placeholder="Ссылка на главу">
         </div>
+        
         <div style="display: flex; gap: 8px;">
+            <select id="mode-select" class="custom-input" style="max-width: 100px; font-weight: bold; color: var(--theme-hex);">
+                <option value="translate">RU ПЕРЕВОД</option>
+                <option value="original">ОРИГИНАЛ</option>
+            </select>
             <button class="action-btn btn-main" style="flex: 1;" onclick="app.processChapter()">
                 <svg class="icon icon-sm icon-fill" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                ПЕРЕВЕСТИ
+                ЧИТАТЬ
             </button>
             <button class="action-btn btn-icon" style="background: rgba(255,255,255,0.05);" onclick="app.addToLibraryCurrent()" title="Добавить в библиотеку">
                 <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
         </div>
-    </div>
-
-    <div id="manual-panel" style="display: none;">
-        <textarea id="manual-input" class="custom-input" rows="4" placeholder="Вставь английский текст главы сюда..."></textarea>
-        <button class="action-btn btn-main" style="width: 100%; margin-top:8px;" onclick="app.processChapter()">
-            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5 12h14"></path><path d="M12 5l7 7-7 7"></path></svg>
-            ПЕРЕВЕСТИ ТЕКСТ
-        </button>
     </div>
 </header>
 
@@ -278,7 +257,7 @@
         <div class="settings-header">
             <div style="display:flex; align-items:center; gap:8px;">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                Настройки Системы
+                Контроль Системы
             </div>
             <button class="icon-btn" onclick="app.toggleSettings()" style="width:30px;height:30px; opacity: 1;">
                 <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -287,37 +266,39 @@
         
         <div class="settings-section">
             <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase; letter-spacing:1px;">Дизайн и Неон</div>
-            
-            <div class="setting-row">
-                <span class="setting-label">Цвет свечения</span>
-                <input type="color" id="cfg-theme" onchange="app.updateSettings()">
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">Цвет фона</span>
-                <input type="color" id="cfg-bg" onchange="app.updateSettings()">
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">Цвет текста</span>
-                <input type="color" id="cfg-text" onchange="app.updateSettings()">
-            </div>
-            <div class="setting-row">
-                <span class="setting-label">Сила неона</span>
-                <input type="range" id="cfg-glow" min="0" max="2" step="0.1" onchange="app.updateSettings()">
-            </div>
+            <div class="setting-row"><span class="setting-label">Цвет свечения</span><input type="color" id="cfg-theme" onchange="app.updateSettings()"></div>
+            <div class="setting-row"><span class="setting-label">Цвет фона</span><input type="color" id="cfg-bg" onchange="app.updateSettings()"></div>
+            <div class="setting-row"><span class="setting-label">Цвет текста</span><input type="color" id="cfg-text" onchange="app.updateSettings()"></div>
+            <div class="setting-row"><span class="setting-label">Сила свечения</span><input type="range" id="cfg-glow" min="0" max="2" step="0.1" onchange="app.updateSettings()"></div>
         </div>
 
         <div class="settings-section">
-            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase; letter-spacing:1px;">Звук (TTS)</div>
-            <select id="voice-engine-select" class="custom-input" style="padding: 8px 10px;">
-                <option value="alisa">Облачный: Алиса</option>
-                <option value="google">Нативный: Google TTS</option>
-                <option value="local">Локальный: Piper ONNX</option>
+            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase;">Нейросетевой звук (OFFLINE)</div>
+            <select id="voice-engine-select" class="custom-input" style="margin-bottom: 10px;" onchange="app.checkModelStatus()">
+                <option value="google">Google TTS</option>
+                <option value="alisa">Yandex Alisa</option>
+                <option value="silero">Silero (V4 RU)</option>
             </select>
-            <div style="margin-top: 10px; display:flex; gap:5px;">
-                <input type="text" id="model-url" class="custom-input" placeholder="URL к .onnx" style="padding: 8px 10px;">
-                <button class="action-btn" style="padding: 8px; border: none;" onclick="app.downloadLocalModel()">
-                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                </button>
+            
+            <div class="setting-row" style="margin-bottom: 12px; background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05);">
+                <span class="setting-label">Скорость</span>
+                <input type="range" id="voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" onchange="app.updateSettings()" oninput="document.getElementById('speed-val').innerText = parseFloat(this.value).toFixed(1) + 'x'">
+                <span id="speed-val" style="font-size:12px; font-weight:900; width:35px; text-align:right; font-family:monospace; color:var(--theme-hex);">1.0x</span>
+            </div>
+
+            <button id="dl-model-btn" class="action-btn btn-main" style="width: 100%; display: none;" onclick="app.downloadLocalModel()">
+                УСТАНОВИТЬ ГОЛОС (~60MB)
+            </button>
+            <div id="model-ok-label" style="display: none; color: var(--success); font-size: 11px; font-weight: 800; text-align: center;">✅ ГОЛОС В ПАМЯТИ</div>
+        </div>
+
+        <div class="settings-section">
+            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase;">База источников</div>
+            <div id="site-manager-list" style="margin-bottom: 15px; max-height: 120px; overflow-y: auto;"></div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="text" id="new-site-name" class="custom-input" placeholder="Имя (напр. MyLibrary)">
+                <input type="text" id="new-site-tpl" class="custom-input" placeholder="Линк (напр. https://site.com/)">
+                <button class="action-btn btn-main" onclick="app.addNewSite()">+ ДОБАВИТЬ САЙТ</button>
             </div>
         </div>
     </div>
@@ -326,7 +307,7 @@
 <main id="reader-container">
     <div style="text-align: center; color: var(--subtext); margin-top: 60px; font-weight: 500;">
         <svg style="width:48px; height:48px; opacity:0.3; margin-bottom:10px; stroke:var(--theme-hex);" viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><br>
-        <span style="font-size: 14px;">Система ожидает текст...</span>
+        <span style="font-size: 14px;">Система ожидает загрузку...</span>
     </div>
 </main>
 
@@ -364,16 +345,30 @@
 </footer>
 
 <script>
-// --- ИНИЦИАЛИЗАЦИЯ ЛОКАЛЬНОЙ БАЗЫ NeonDB ---
+// Настройки ядра ONNX для автономной работы в APK
+ort.env.logLevel = 'error';
+ort.env.wasm.numThreads = 1; 
+ort.env.wasm.wasmPaths = './'; 
+
+const MODEL_LINKS = {
+    silero: "https://models.silero.ai/models/tts/ru/v4_ru.onnx"
+};
+
+// Токены для оффлайн ИИ синтезатора Silero
+const SILERO_TOKENS = {" ": 1, "!": 2, "-": 3, ".": 4, "0": 5, "1": 6, "2": 7, "3": 8, "4": 9, "5": 10, "6": 11, "7": 12, "8": 13, "9": 14, "?": 15, "а": 16, "б": 17, "в": 18, "г": 19, "д": 20, "е": 21, "ж": 22, "з": 23, "и": 24, "й": 25, "к": 26, "л": 27, "м": 28, "н": 29, "о": 30, "п": 31, "р": 32, "с": 33, "т": 34, "у": 35, "ф": 36, "х": 37, "ц": 38, "ч": 39, "ш": 40, "щ": 41, "ъ": 42, "ы": 43, "ь": 44, "э": 45, "ю": 46, "я": 47, "ё": 48};
+
 const NeonDB = {
     db: null,
     async init() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open("NeonReaderDB", 1);
+            const req = indexedDB.open("NeonReaderDB", 2);
             req.onupgradeneeded = (e) => {
                 this.db = e.target.result;
                 if (!this.db.objectStoreNames.contains("chapters")) {
                     this.db.createObjectStore("chapters", { keyPath: "url" });
+                }
+                if (!this.db.objectStoreNames.contains("models")) {
+                    this.db.createObjectStore("models", { keyPath: "id" });
                 }
             };
             req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
@@ -408,6 +403,21 @@ const NeonDB = {
                 } else resolve();
             };
         });
+    },
+    async saveModel(id, blob) {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction("models", "readwrite");
+            tx.objectStore("models").put({ id: id, data: blob });
+            tx.oncomplete = () => resolve();
+        });
+    },
+    async getModel(id) {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction("models", "readonly");
+            const req = tx.objectStore("models").get(id);
+            req.onsuccess = () => resolve(req.result ? req.result.data : null);
+            req.onerror = () => resolve(null);
+        });
     }
 };
 
@@ -415,10 +425,11 @@ const app = {
     sents: [], currentIndex: -1, isPlaying: false,
     audio: new Audio(), nextUrl: null,
     yKey: "069b6659-984b-4c5f-880e-aaedcfd84102",
-    manualMode: false, library: [], voices: [], sites: [],
+    library: [], voices: [], sites: [],
     settingsOpen: false, libOpen: false,
     currentBookMetadata: { title: '', cover: '' },
     activeDownloads: {},
+    captchaPendingUrl: null,
 
     async init() {
         await NeonDB.init();
@@ -434,32 +445,80 @@ const app = {
             if(this.audio.src.includes('blob:')) URL.revokeObjectURL(this.audio.src);
             this.jump(1);
         };
+        
+        this.updateSiteTemplate();
+        this.checkModelStatus();
+
+        // Авто-загрузка последней прочитанной главы
+        const savedSession = localStorage.getItem('neon_pro_save');
+        if(savedSession) {
+            try {
+                const data = JSON.parse(savedSession);
+                if(data.url) {
+                    document.getElementById('url-input').value = data.url;
+                    this.processChapter().then(() => {
+                        if(data.index !== undefined) setTimeout(() => this.play(data.index), 800);
+                    });
+                }
+            } catch(e) {}
+        }
     },
 
-    toast(msg, type = 'ok') {
+    clearToasts() {
+        const container = document.getElementById('toast-container');
+        if (container) container.innerHTML = '';
+    },
+
+    logToast(msg, type = 'ok', duration = 3000) {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        const icon = type === 'error' ? 
-            `<svg class="icon icon-sm" style="color:var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>` : 
-            `<svg class="icon icon-sm" style="color:var(--theme-hex);" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-        toast.innerHTML = `${icon} <span>${msg}</span>`;
+        
+        const content = document.createElement('span');
+        content.innerText = msg;
+        toast.appendChild(content);
+
+        if (duration === 0 || type === 'error') {
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'toast-close';
+            closeBtn.innerHTML = '<svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+            closeBtn.onclick = () => {
+                toast.classList.add('fadeOut');
+                setTimeout(() => toast.remove(), 300);
+            };
+            toast.appendChild(closeBtn);
+        }
+
         container.appendChild(toast);
-        setTimeout(() => { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
+
+        if (duration > 0 && type !== 'error') {
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.classList.add('fadeOut');
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, duration);
+        }
+        
+        return toast; 
     },
 
-    // --- УПРАВЛЕНИЕ ДИЗАЙНОМ (RGB) ---
     hexToRgb(hex) {
         let bigint = parseInt(hex.replace('#',''), 16);
         return `${(bigint >> 16) & 255}, ${(bigint >> 8) & 255}, ${bigint & 255}`;
     },
 
     loadSettings() {
-        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', text: '#f1f5f9', glow: 1 };
+        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', text: '#f1f5f9', glow: 1, speed: 1.0 };
         document.getElementById('cfg-theme').value = conf.theme;
         document.getElementById('cfg-bg').value = conf.bg;
         document.getElementById('cfg-text').value = conf.text;
         document.getElementById('cfg-glow').value = conf.glow;
+        
+        if(document.getElementById('voice-speed')) {
+            document.getElementById('voice-speed').value = conf.speed || 1.0;
+            document.getElementById('speed-val').innerText = parseFloat(conf.speed || 1.0).toFixed(1) + 'x';
+        }
         this.applySettingsUI(conf);
     },
 
@@ -468,10 +527,12 @@ const app = {
             theme: document.getElementById('cfg-theme').value,
             bg: document.getElementById('cfg-bg').value,
             text: document.getElementById('cfg-text').value,
-            glow: document.getElementById('cfg-glow').value
+            glow: document.getElementById('cfg-glow').value,
+            speed: document.getElementById('voice-speed') ? document.getElementById('voice-speed').value : 1.0
         };
         localStorage.setItem('neon_custom_ui', JSON.stringify(conf));
         this.applySettingsUI(conf);
+        if (this.audio) this.audio.playbackRate = parseFloat(conf.speed);
     },
 
     applySettingsUI(conf) {
@@ -498,89 +559,99 @@ const app = {
     },
 
     loadSitesData() {
-        const defaultSites = [
-            { id: 'novelbin', name: 'NovelBin' },
-            { id: 'freewebnovel', name: 'FreeWeb' },
-            { id: 'lightnovelpub', name: 'LightNovel' }
+        const defaults = [
+            { id: 'freeweb', name: 'FreeWeb', tpl: 'https://freewebnovel.com/raising-villains-the-right-way/chapter-178.html' },
+            { id: 'webnovel', name: 'WebNovel', tpl: 'https://www.webnovel.com/book/34399524700668605/92441271259430324' }
         ];
-        this.sites = JSON.parse(localStorage.getItem('neon_custom_sites')) || defaultSites;
-        const select = document.getElementById('site-select');
-        select.innerHTML = '';
-        this.sites.forEach(s => select.add(new Option(s.name, s.id)));
+        this.sites = JSON.parse(localStorage.getItem('neon_custom_sites')) || defaults;
+        this.renderSiteSelectors();
     },
 
-    ensureSiteInList(urlStr) {
-        try {
-            const urlObj = new URL(urlStr);
-            const domain = urlObj.hostname.replace('www.', '').split('.')[0];
-            const exists = this.sites.find(s => s.id === domain);
-            if (!exists) {
-                const name = domain.charAt(0).toUpperCase() + domain.slice(1);
-                this.sites.push({ id: domain, name: name });
-                localStorage.setItem('neon_custom_sites', JSON.stringify(this.sites));
-                this.loadSitesData();
-            }
-            document.getElementById('site-select').value = domain;
-        } catch(e) {}
+    renderSiteSelectors() {
+        const sel = document.getElementById('site-select');
+        const list = document.getElementById('site-manager-list');
+        if(!sel || !list) return;
+        sel.innerHTML = ''; list.innerHTML = '';
+        this.sites.forEach(s => {
+            sel.add(new Option(s.name, s.id));
+            const div = document.createElement('div');
+            div.className = 'site-item';
+            div.style = "display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px;";
+            div.innerHTML = `<span>${s.name}</span><button onclick="app.deleteSite('${s.id}')" style="background:none; border:none; color:var(--danger); cursor:pointer; font-weight:800;">УДАЛИТЬ</button>`;
+            list.appendChild(div);
+        });
+    },
+
+    addNewSite() {
+        const n = document.getElementById('new-site-name').value;
+        const t = document.getElementById('new-site-tpl').value;
+        if (!n || !t) return;
+        this.sites.push({ id: 'custom_' + Date.now(), name: n, tpl: t });
+        localStorage.setItem('neon_custom_sites', JSON.stringify(this.sites));
+        this.loadSitesData();
+        this.logToast("Сайт добавлен", "ok");
+    },
+
+    deleteSite(id) {
+        this.sites = this.sites.filter(s => s.id !== id);
+        localStorage.setItem('neon_custom_sites', JSON.stringify(this.sites));
+        this.loadSitesData();
     },
 
     updateSiteTemplate() {
-        const site = document.getElementById('site-select').value;
-        const input = document.getElementById('url-input');
-        if(site === 'novelbin') input.value = 'https://novelbin.com/b/';
-        else if(site === 'freewebnovel') input.value = 'https://freewebnovel.com/';
-        else if(site === 'lightnovelpub') input.value = 'https://www.lightnovelpub.vip/novel/';
-        else input.value = `https://${site}.com/`;
+        const id = document.getElementById('site-select').value;
+        const site = this.sites.find(s => s.id === id);
+        if (site) document.getElementById('url-input').value = site.tpl;
     },
 
-    // --- БИБЛИОТЕКА И ОФФЛАЙН ЗАГРУЗКА ---
     loadLibraryData() { this.library = JSON.parse(localStorage.getItem('neon_books_db')) || []; },
     saveLibraryData() { localStorage.setItem('neon_books_db', JSON.stringify(this.library)); this.renderLibraryGrid(); },
 
     addToLibraryCurrent() {
         const url = document.getElementById('url-input').value;
-        if(!url || url.length < 15) return this.toast('Введите ссылку!', 'error');
+        if(!url || url.length < 15) return this.logToast('Введите ссылку!', 'error');
         const domain = new URL(url).hostname.replace('www.', '').split('.')[0];
         let title = this.currentBookMetadata.title || url.split('/').filter(Boolean).pop().replace(/-/g, ' ');
         title = title.charAt(0).toUpperCase() + title.slice(1);
-        const newBook = { id: Date.now().toString(), title: title, url: url, site: domain, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, isDownloaded: false };
+        const newBook = { id: Date.now().toString(), title: title, url: url, site: document.getElementById('site-select').value, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, isDownloaded: false };
         this.library.push(newBook);
         this.saveLibraryData();
-        this.toast("Сохранено в Библиотеку!", "ok");
+        this.logToast("Сохранено в Библиотеку!", "ok");
+    },
+
+    async deleteEntireBook(id) {
+        if(!confirm("Удалить книгу и все скачанные главы навсегда?")) return;
+        await NeonDB.deleteBookChapters(id);
+        this.library = this.library.filter(b => b.id !== id);
+        this.saveLibraryData();
+        this.renderLibraryGrid();
+        this.logToast("Книга удалена", "ok");
     },
 
     renderLibraryGrid() {
         const grid = document.getElementById('library-grid');
         grid.innerHTML = '';
-        if(this.library.length === 0) { grid.innerHTML = '<div style="color:var(--subtext); text-align:center; width:100%; grid-column: 1 / -1; margin-top:50px; font-size:14px;">Библиотека пуста. Добавьте книгу с главного экрана.</div>'; return; }
+        if(this.library.length === 0) { grid.innerHTML = '<div style="color:var(--subtext); text-align:center; width:100%; margin-top:80px; font-weight:bold;">БИБЛИОТЕКА ПУСТА</div>'; return; }
 
         this.library.forEach(book => {
             const card = document.createElement('div');
             card.className = `book-card ${book.isDownloading ? 'downloading' : (book.isDownloaded ? 'downloaded' : '')}`;
             
-            const coverIcon = `<svg class="icon" style="width:30px;height:30px;stroke:var(--glass-border);" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
-            const coverHtml = book.coverUrl ? `<img src="${book.coverUrl}" class="book-cover" onerror="this.outerHTML='<div class=\\'book-cover-placeholder\\'>${coverIcon}</div>'">` : `<div class="book-cover-placeholder">${coverIcon}</div>`;
+            const coverHtml = book.coverUrl ? `<img src="${book.coverUrl}" class="book-cover">` : `<div class="book-cover" style="display:flex; align-items:center; justify-content:center; background:#111; color:#222; font-weight:900;">NEON</div>`;
             
-            let btnAction = '';
-            if (book.isDownloading) btnAction = `<button class="action-btn book-btn" style="color:var(--danger);" onclick="app.stopDownload('${book.id}')" title="Остановить"><svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg></button>`;
-            else if (book.isDownloaded) btnAction = `<button class="action-btn book-btn" style="color:var(--danger);" onclick="app.deleteDownload('${book.id}')" title="Удалить кэш"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
-            else btnAction = `<button class="action-btn book-btn" style="color:var(--theme-hex);" onclick="app.startDownload('${book.id}')" title="Скачать всё"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>`;
+            let btnAction = book.isDownloading 
+                ? `<button class="action-btn book-btn" style="color:var(--danger);" onclick="app.stopDownload('${book.id}')">СТОП</button>`
+                : `<button class="action-btn book-btn" style="color:var(--theme-hex);" onclick="app.startDownload('${book.id}')">${book.isDownloaded ? 'ОБНОВИТЬ' : 'СКАЧАТЬ'}</button>`;
 
             card.innerHTML = `
+                <div class="download-badge" id="badge-${book.id}">0</div>
                 <div class="book-content">
                     ${coverHtml}
-                    <div class="book-info">
-                        <div>
-                            <div class="book-site">${book.site}</div>
-                            <div class="book-title">${book.title}</div>
-                        </div>
-                        <div class="book-actions">
-                            <button class="action-btn book-btn" style="flex:2;" onclick="app.loadBookFromLib('${book.id}')">
-                                <svg class="icon icon-sm icon-fill" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                            </button>
-                            <button class="action-btn book-btn" onclick="app.editBook('${book.id}')" title="Редактировать">
-                                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                            </button>
+                    <div class="book-info" style="padding:15px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+                        <div class="book-title" style="font-size:14px; font-weight:800; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${book.title}</div>
+                        <div class="book-actions" style="display:flex; gap:8px; margin-top:10px;">
+                            <button class="action-btn book-btn" style="flex:1; background:var(--theme-hex); color:#fff; border:none;" onclick="app.loadBookFromLib('${book.id}')">ЧИТАТЬ</button>
+                            <button class="action-btn book-btn" style="width:40px; color:var(--danger);" onclick="app.deleteEntireBook('${book.id}')">🗑️</button>
                             ${btnAction}
                         </div>
                     </div>
@@ -592,42 +663,111 @@ const app = {
 
     loadBookFromLib(id) {
         const book = this.library.find(b => b.id === id);
-        if(book) { document.getElementById('url-input').value = book.url; this.toggleLibrary(); this.processChapter(); }
-    },
-
-    editBook(id) {
-        const book = this.library.find(b => b.id === id);
-        if(book) {
-            const newTitle = prompt("Название книги:", book.title);
-            if(newTitle !== null) book.title = newTitle;
-            const newCover = prompt("Ссылка на обложку (URL картинки):", book.coverUrl);
-            if(newCover !== null) book.coverUrl = newCover;
-            this.saveLibraryData();
+        if(book) { 
+            document.getElementById('site-select').value = book.site || 'freeweb'; 
+            document.getElementById('url-input').value = book.url; 
+            this.toggleLibrary(); 
+            this.processChapter(); 
         }
     },
 
-    // --- ФОНОВЫЙ ПАРСЕР КНИГ ---
+    openCaptchaModal(url) {
+        this.captchaPendingUrl = url;
+        const modal = document.getElementById('captcha-modal');
+        modal.style.display = 'flex';
+    },
+
+    async openBypassBrowser() {
+        if (!this.captchaPendingUrl) return;
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Browser) {
+            try {
+                await window.Capacitor.Plugins.Browser.open({ url: this.captchaPendingUrl, presentationStyle: 'popover' });
+            } catch(e) {
+                window.open(this.captchaPendingUrl, '_blank');
+            }
+        } else {
+            window.open(this.captchaPendingUrl, '_blank');
+        }
+    },
+
+    closeCaptchaAndRetry() {
+        document.getElementById('captcha-modal').style.display = 'none';
+        this.clearToasts();
+        this.logToast("Ожидание подтверждения...", "ok");
+        if (this.captchaPendingUrl) {
+            document.getElementById('url-input').value = this.captchaPendingUrl;
+            this.captchaPendingUrl = null;
+            this.processChapter();
+        }
+    },
+
     async networkFetchCore(url, site) {
-        const proxies = [`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, `https://corsproxy.io/?${encodeURIComponent(url)}`];
+        const endpoints = [
+            url, 
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+            `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+        ];
+
         let html = "";
-        for (let p of proxies) { try { const r = await fetch(p); if (r.ok) { html = await r.text(); break; } } catch(e) {} }
-        if (!html || html.includes("Cloudflare")) throw new Error("Защита Cloudflare");
+        let success = false;
+        let lastError = "";
+
+        for (let i = 0; i < endpoints.length; i++) {
+            this.clearToasts(); 
+            const proxyName = i === 0 ? "Прямое соединение" : new URL(endpoints[i]).hostname;
+            let t = this.logToast(`Проверка: ${proxyName}...`, 'ok', 0);
+            
+            try {
+                const res = await fetch(endpoints[i]);
+                let text = await res.text();
+                    
+                if (text.trim().startsWith('{') && text.includes('"contents"')) {
+                    try { text = JSON.parse(text).contents; } catch(e){}
+                }
+
+                const isCloudflare = text.includes('<title>Just a moment...</title>') || 
+                                     text.includes('id="challenge-running"');
+
+                if (isCloudflare) {
+                    t.remove();
+                    this.openCaptchaModal(url);
+                    throw new Error("Требуется обход защиты (Cloudflare). Ожидание действий пользователя.");
+                }
+
+                if (res.ok && text.length > 500) {
+                    html = text;
+                    success = true;
+                    t.remove();
+                    this.logToast(`Установлено!`, 'ok', 1000);
+                    break;
+                } else {
+                    lastError = `Пустой ответ или статус ${res.status}`;
+                }
+            } catch(e) {
+                if (e.message.includes("Требуется обход защиты")) throw e;
+                lastError = e.message; 
+            }
+            t.remove();
+        }
+
+        if (!success) throw new Error(`Сбой: ${lastError}`);
 
         const doc = new DOMParser().parseFromString(html, 'text/html');
         let sel = 'p';
         if (site === 'novelbin') sel = '.chr-c p, #chr-content p';
-        else if (site === 'freewebnovel') sel = '.txt p, .article-content p';
+        else if (site === 'freeweb' || site === 'freewebnovel') sel = '.txt p, .article-content p';
         else if (site === 'lightnovelpub') sel = '#chapter-container p, .chapter-content p';
         else sel = 'p, div.text, div.content, .chapter-content p'; 
 
         let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(t => t.length > 20);
         if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t.length > 30);
-        if (paras.length < 3) throw new Error("Текст не найден");
+        if (paras.length === 0) throw new Error("Текст не найден. Структура сайта изменилась.");
 
         let nUrl = null;
         Array.from(doc.querySelectorAll('a')).forEach(a => {
             const text = a.innerText.toLowerCase();
-            if (text.includes('next') || text.includes('следующая')) {
+            if (text.includes('next') || text.includes('следующая') || text.includes('вперед')) {
                 const href = a.getAttribute('href');
                 if (href && href !== '#') nUrl = new URL(href, url).href;
             }
@@ -638,54 +778,54 @@ const app = {
 
     async startDownload(id) {
         let book = this.library.find(b => b.id === id);
-        if (!book || book.isDownloaded) return;
+        if (!book) return;
         
-        book.isDownloading = true; this.activeDownloads[id] = true; this.saveLibraryData();
-        this.toast(`Фоновая загрузка: ${book.title}`, "ok");
-
+        book.isDownloading = true; this.activeDownloads[id] = true; 
+        this.renderLibraryGrid(); 
+        
+        const badge = document.getElementById(`badge-${id}`);
         let curUrl = book.url;
         let count = 0;
+        const isTranslateMode = document.getElementById('mode-select').value === 'translate';
 
         while(curUrl && this.activeDownloads[id]) {
             let existing = await NeonDB.getChapter(curUrl);
-            if (existing) { curUrl = existing.nextUrl; } 
-            else {
+            if (existing) { 
+                curUrl = existing.nextUrl; 
+            } else {
                 try {
-                    let data = await this.networkFetchCore(curUrl, book.site);
-                    await NeonDB.saveChapter(curUrl, id, data.text, data.nextUrl);
-                    curUrl = data.nextUrl; count++;
-                    await new Promise(r => setTimeout(r, 1500)); 
+                    let data = await this.networkFetchCore(curUrl, book.site || 'freeweb');
+                    
+                    let textToSave = data.text;
+                    if(isTranslateMode) {
+                        textToSave = await this.translate(data.text);
+                    }
+                    
+                    await NeonDB.saveChapter(curUrl, id, textToSave, data.nextUrl);
+                    curUrl = data.nextUrl;
+                    count++;
+                    if(badge) { badge.style.display = 'block'; badge.innerText = count; }
+                    
+                    await new Promise(r => setTimeout(r, 350)); 
                 } catch(e) {
-                    this.toast(`Сбой скачивания.`, "error"); break;
+                    this.logToast(`Сбой на главе ${count + 1}`, "error");
+                    break;
                 }
             }
         }
         
-        if (this.activeDownloads[id]) { 
-            book.isDownloading = false; book.isDownloaded = true; this.activeDownloads[id] = false;
-            this.saveLibraryData(); this.toast(`Скачано в оффлайн кэш!`, "ok");
-        }
+        book.isDownloading = false; 
+        book.isDownloaded = true; 
+        this.activeDownloads[id] = false;
+        this.saveLibraryData();
+        this.renderLibraryGrid();
+        this.logToast(`Загрузка завершена!`, "ok");
     },
 
     stopDownload(id) {
         this.activeDownloads[id] = false;
         let book = this.library.find(b => b.id === id);
-        if(book) { book.isDownloading = false; this.saveLibraryData(); this.toast("Загрузка прервана.", "ok"); }
-    },
-
-    async deleteDownload(id) {
-        if(confirm("Удалить скачанные главы из памяти телефона?")) {
-            await NeonDB.deleteBookChapters(id);
-            let book = this.library.find(b => b.id === id);
-            if(book) { book.isDownloaded = false; this.saveLibraryData(); this.toast("Удалено.", "ok"); }
-        }
-    },
-
-    // --- ПАРСИНГ ДЛЯ ЧТЕНИЯ (ONLINE/OFFLINE) ---
-    toggleManual() {
-        this.manualMode = !this.manualMode;
-        document.getElementById('manual-panel').style.display = this.manualMode ? 'block' : 'none';
-        document.getElementById('main-controls').style.display = this.manualMode ? 'none' : 'block';
+        if(book) { book.isDownloading = false; this.saveLibraryData(); this.clearToasts(); this.logToast("Загрузка прервана.", "ok"); }
     },
 
     async processChapter() {
@@ -693,49 +833,72 @@ const app = {
         this.audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
         this.audio.play().catch(()=>{});
 
-        let rawText = "";
-        this.currentBookMetadata = { title: '', cover: '' };
+        this.clearToasts();
+        const url = document.getElementById('url-input').value;
+        const mode = document.getElementById('mode-select').value; 
+        this.ensureSiteInList(url); 
+        const site = document.getElementById('site-select').value;
 
-        if (this.manualMode) {
-            rawText = document.getElementById('manual-input').value.trim();
-            if (rawText.length < 50) return this.toast("Текст слишком короткий!", "error");
-        } else {
-            const url = document.getElementById('url-input').value;
-            this.ensureSiteInList(url); 
-            const site = document.getElementById('site-select').value;
+        let rawText = "";
+        let isAlreadyTranslated = false;
+        this.currentBookMetadata = { title: '', cover: '' };
             
-            // 1. Проверяем локальную базу (ОФФЛАЙН)
-            const dbData = await NeonDB.getChapter(url);
-            if (dbData) {
-                this.toast("Извлечено из оффлайн кэша", "ok");
-                rawText = dbData.text;
-                this.nextUrl = dbData.nextUrl;
-            } else {
-                // 2. Идем в интернет (ОНЛАЙН)
-                this.toast("Стучимся на сайт...", "ok");
-                try {
-                    const data = await this.networkFetchCore(url, site);
-                    rawText = data.text;
-                    this.nextUrl = data.nextUrl;
-                    this.currentBookMetadata.title = data.title;
-                    this.currentBookMetadata.cover = data.cover;
-                } catch (e) { return this.toast(e.message, "error"); }
+        let tDb = this.logToast("Проверка локальной базы NeonDB...", "ok", 0);
+        const dbData = await NeonDB.getChapter(url);
+        
+        if (dbData) {
+            tDb.remove();
+            this.logToast("Текст извлечен из памяти", "ok");
+            rawText = dbData.text;
+            this.nextUrl = dbData.nextUrl;
+            
+            // Фикс бага перевода: Если 10%+ текста на кириллице, он уже переведен!
+            const ruChars = rawText.match(/[а-яА-ЯёЁ]/g);
+            if (ruChars && ruChars.length > rawText.length * 0.1) {
+                isAlreadyTranslated = true;
+            }
+        } else {
+            tDb.remove();
+            try {
+                const data = await this.networkFetchCore(url, site);
+                rawText = data.text;
+                this.nextUrl = data.nextUrl;
+                this.currentBookMetadata.title = data.title;
+                this.currentBookMetadata.cover = data.cover;
+            } catch (e) { 
+                if (e.message.includes("Требуется обход защиты")) return;
+                this.clearToasts();
+                return this.logToast(e.message, "error"); 
             }
         }
 
-        this.toast("Нейроперевод...", "ok");
-        try {
-            const translatedText = await this.translate(rawText);
-            this.render(translatedText);
-            this.toast("Готово. Нажми Play", "ok");
-        } catch (e) { this.toast("Сбой перевода.", "error"); }
+        if (mode === "translate" && !isAlreadyTranslated) {
+            this.clearToasts();
+            let tTr = this.logToast("Нейроперевод активирован...", "ok", 0);
+            try {
+                const translatedText = await this.translate(rawText);
+                this.render(translatedText);
+                tTr.remove();
+                this.logToast("Готово. Плеер ожидает.", "ok");
+            } catch (e) { 
+                tTr.remove();
+                this.logToast("Сбой перевода.", "error"); 
+            }
+        } else {
+            this.clearToasts();
+            let msg = isAlreadyTranslated ? "Открыт русский кэш..." : "Очистка оригинала...";
+            let tOr = this.logToast(msg, "ok", 0);
+            this.render(rawText);
+            tOr.remove();
+            this.logToast("Готово. Плеер ожидает.", "ok");
+        }
     },
 
     async translate(text) {
         const chunks = text.match(/[\s\S]{1,1500}(?=\n\n|$)/g) || [text];
         let result = "";
         for (let i = 0; i < chunks.length; i++) {
-            const tUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&q=${encodeURIComponent(chunks[i])}`;
+            const tUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ru&dt=t&q=${encodeURIComponent(chunks[i])}`;
             const r = await fetch(tUrl); const d = await r.json();
             result += d[0].map(x => x[0]).join('') + "\n\n";
             await new Promise(ok => setTimeout(ok, 350));
@@ -763,22 +926,124 @@ const app = {
         this.currentIndex = -1; this.updateUI();
     },
 
-    downloadLocalModel() { this.toast("Загрузка .onnx требует интеграции WASM.", "ok"); },
+    async checkModelStatus() {
+        const engine = document.getElementById('voice-engine-select').value;
+        const btn = document.getElementById('dl-model-btn');
+        const label = document.getElementById('model-ok-label');
+        
+        if (engine === 'silero') {
+            const stored = await NeonDB.getModel(engine);
+            btn.style.display = stored ? 'none' : 'flex';
+            label.style.display = stored ? 'block' : 'none';
+        } else {
+            btn.style.display = 'none'; label.style.display = 'none';
+        }
+    },
 
-    // --- ПЛЕЕР И АУДИО ---
+    async downloadLocalModel() {
+        const engine = document.getElementById('voice-engine-select').value;
+        const url = MODEL_LINKS[engine];
+        if(!url) return this.logToast("Движок не поддерживается оффлайн", "error");
+        
+        this.clearToasts();
+        let t = this.logToast(`Загрузка ИИ-голоса [${engine}]...`, "ok", 0);
+        
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Сервер недоступен");
+            const reader = res.body.getReader();
+            let chunks = [];
+            let loaded = 0;
+            const total = parseInt(res.headers.get('content-length')) || 60000000;
+
+            while(true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                loaded += value.length;
+                t.querySelector('span').innerText = `Загрузка: ${Math.round((loaded/total)*100)}%`;
+            }
+            
+            await NeonDB.saveModel(engine, new Blob(chunks));
+            t.remove();
+            this.logToast("ГОЛОС УСТАНОВЛЕН", "ok");
+            this.checkModelStatus();
+        } catch(e) {
+            t.remove();
+            this.logToast("Сбой сети: " + e.message, "error");
+        }
+    },
+
+    async playOfflineModel(text, engine) {
+        if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.clearToasts();
+        
+        let t = this.logToast(`Нейронка думает...`, "ok", 0);
+        
+        try {
+            const blob = await NeonDB.getModel(engine);
+            if (!blob) throw new Error("Сначала скачай голос в настройках!");
+
+            const modelBuffer = await blob.arrayBuffer();
+            const session = await ort.InferenceSession.create(modelBuffer, { executionProviders: ['wasm'] });
+
+            const chars = text.toLowerCase().split("");
+            const tokens = chars.map(c => SILERO_TOKENS[c] || 1).filter(Boolean);
+            
+            const inputTensor = new ort.Tensor('int64', BigInt64Array.from(tokens.map(BigInt)), [1, tokens.length]);
+            const srTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(24000)]), []);
+            const speakerTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(0)]), []); 
+
+            const feeds = { input: inputTensor, sr: srTensor, speaker: speakerTensor };
+            const results = await session.run(feeds);
+            const audioData = results.output.data; 
+
+            const audioBuffer = this.audioCtx.createBuffer(1, audioData.length, 24000);
+            audioBuffer.getChannelData(0).set(audioData);
+            
+            if (this.audioSource) { try { this.audioSource.stop(); } catch(e){} }
+            this.audioSource = this.audioCtx.createBufferSource();
+            this.audioSource.buffer = audioBuffer;
+            
+            const currentSpeed = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
+            this.audioSource.playbackRate.value = currentSpeed;
+
+            this.audioSource.connect(this.audioCtx.destination);
+            this.audioSource.onended = () => { if(this.isPlaying) this.jump(1); };
+            
+            t.remove();
+            this.audioSource.start();
+            this.isPlaying = true; this.updateUI();
+        } catch(e) {
+            t.remove();
+            this.logToast("Ошибка ИИ: " + e.message, "error");
+            this.stop();
+        }
+    },
+
     async play(index) {
         if (index < 0 || index >= this.sents.length) return this.stop();
         this.currentIndex = index; this.updateUI();
         const voice = document.getElementById('voice-engine-select').value;
         const text = this.sents[index];
-        if (voice === 'google') this.playGoogle(text);
-        else if (voice === 'local') this.toast("Локальный движок не интегрирован.", "error");
-        else await this.playAlisa(text);
+        
+        if (voice === 'google') {
+            this.playGoogle(text);
+        } else if (voice === 'alisa') {
+            await this.playAlisa(text);
+        } else if (voice === 'silero') {
+            await this.playOfflineModel(text, voice);
+        } else {
+            this.clearToasts();
+            this.logToast(`Модуль ${voice.toUpperCase()} не поддерживается!`, "error");
+            this.stop();
+        }
     },
 
     playGoogle(text) {
         window.speechSynthesis.cancel();
         const utt = new SpeechSynthesisUtterance(text); utt.lang = 'ru-RU';
+        utt.rate = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
         if (this.voices.length > 0) utt.voice = this.voices.find(v => v.name.includes('Google') || v.name.includes('ru-RU')) || this.voices[0];
         utt.onend = () => { if (this.isPlaying) this.jump(1); };
         window.speechSynthesis.speak(utt);
@@ -786,19 +1051,39 @@ const app = {
     },
 
     async playAlisa(text) {
-        const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=1.0`;
-        try { this.audio.src = ttsUrl; await this.audio.play(); this.isPlaying = true; this.updateUI(); } 
+        const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0).toFixed(1);
+        const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=${speed}`;
+        try { 
+            this.audio.src = ttsUrl; 
+            this.audio.playbackRate = parseFloat(speed);
+            await this.audio.play(); 
+            this.isPlaying = true; 
+            this.updateUI(); 
+        } 
         catch (e) {
             try {
-                const proxies = [`https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`, `https://corsproxy.io/?${encodeURIComponent(ttsUrl)}`];
+                const proxies = [`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`, `https://corsproxy.io/?${encodeURIComponent(ttsUrl)}`];
                 let success = false;
                 for (let p of proxies) {
-                    try { const res = await fetch(p); if (res.ok) { const blob = await res.blob(); if (blob.size > 1000) { this.audio.src = URL.createObjectURL(blob); await this.audio.play(); success = true; break; } } } catch (err) {}
+                    try { 
+                        const res = await fetch(p); 
+                        if (res.ok) { 
+                            const blob = await res.blob(); 
+                            if (blob.size > 1000) { 
+                                this.audio.src = URL.createObjectURL(blob); 
+                                this.audio.playbackRate = parseFloat(speed);
+                                await this.audio.play(); 
+                                success = true; 
+                                break; 
+                            } 
+                        } 
+                    } catch (err) {}
                 }
                 if (!success) throw new Error();
                 this.isPlaying = true; this.updateUI();
             } catch (err) {
-                this.toast("Яндекс отказ. Включен Google.", "error");
+                this.clearToasts();
+                this.logToast("Яндекс отказ. Включен Google TTS.", "error");
                 document.getElementById('voice-engine-select').value = 'google';
                 this.playGoogle(text);
             }
@@ -806,7 +1091,10 @@ const app = {
     },
 
     togglePlay() {
-        if (!this.sents.length) return this.toast("Сначала загрузи главу!", "error");
+        if (!this.sents.length) {
+            this.clearToasts();
+            return this.logToast("Сначала загрузи главу!", "error");
+        }
         if (this.isPlaying) { this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; } 
         else { this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); }
         this.updateUI();
@@ -817,21 +1105,34 @@ const app = {
     seekProgress(e) { if(!this.sents.length) return; const rect = e.currentTarget.getBoundingClientRect(); this.play(Math.floor(this.sents.length * ((e.clientX - rect.left) / rect.width))); },
 
     saveBookmark() {
-        if (this.currentIndex === -1) return this.toast("Нечего сохранять!", "error");
+        if (this.currentIndex === -1) {
+            this.clearToasts();
+            return this.logToast("Нечего сохранять!", "error");
+        }
         const data = { url: document.getElementById('url-input').value, index: this.currentIndex };
         localStorage.setItem('neon_pro_save', JSON.stringify(data));
-        this.toast("Закладка сохранена!", "ok");
+        this.clearToasts();
+        this.logToast("Закладка сохранена!", "ok");
     },
-    async loadBookmark() {
-        const data = JSON.parse(localStorage.getItem('neon_pro_save'));
-        if (!data) return this.toast("Нет закладок.", "error");
-        this.manualMode = false; document.getElementById('manual-panel').style.display = 'none'; document.getElementById('main-controls').style.display = 'block';
-        document.getElementById('url-input').value = data.url;
-        await this.processChapter(); setTimeout(() => this.play(data.index), 1000);
+    
+    downloadMp3() { 
+        if (this.currentIndex !== -1 && this.audio.src && !this.audio.src.includes('data:audio')) {
+            window.open(this.audio.src); 
+        } else {
+            this.clearToasts();
+            this.logToast("MP3 недоступен.", "error");
+        }
     },
-
-    downloadMp3() { if (this.currentIndex !== -1 && this.audio.src && !this.audio.src.includes('data:audio')) window.open(this.audio.src); else this.toast("MP3 недоступен.", "error"); },
-    nextChapter() { if (this.nextUrl) { document.getElementById('url-input').value = this.nextUrl; this.processChapter(); } else this.toast("Ссылка не найдена.", "error"); },
+    
+    nextChapter() { 
+        if (this.nextUrl) { 
+            document.getElementById('url-input').value = this.nextUrl; 
+            this.processChapter(); 
+        } else {
+            this.clearToasts();
+            this.logToast("Ссылка не найдена.", "error");
+        }
+    },
 
     updateUI() {
         const iconPlay = `<svg class="icon-fill" style="width:22px;height:22px;margin-left:3px;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
@@ -845,6 +1146,9 @@ const app = {
             activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             document.getElementById('progress-fill').style.width = (((this.currentIndex + 1) / this.sents.length) * 100) + "%";
             document.getElementById('counter').innerText = `${this.currentIndex + 1}/${this.sents.length}`;
+            
+            const data = { url: document.getElementById('url-input').value, index: this.currentIndex };
+            localStorage.setItem('neon_pro_save', JSON.stringify(data));
         }
     }
 };
