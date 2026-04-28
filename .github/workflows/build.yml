@@ -1,7 +1,7 @@
 name: NeonReader Build PRO
 
 on:
-  workflow_dispatch: # Запуск кнопкой в GitHub Actions
+  workflow_dispatch: # Запуск по кнопке
 
 jobs:
   build:
@@ -11,11 +11,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java & Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Setup Java Environment
+          
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -25,30 +26,30 @@ jobs:
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/app @capacitor/browser @capacitor/share
-          # Инструменты для сжатия кода
-          npm install html-minifier-terser esbuild
+          # Ставим минификатор, чтобы код летал
+          npm install html-minifier-terser
 
       - name: Prepare Web Content
         run: |
           mkdir -p public
-          # Сжимаем твой HTML для скорости работы на телефоне
+          # Сжимаем единственный index.html и кидаем в папку сборки
           npx html-minifier-terser index.html --minify-js --collapse-whitespace --remove-comments --output public/index.html
-          
-          # КОПИРУЕМ ЯДРО НЕЙРОСЕТИ В ПАПКУ СБОРКИ
-          cp ort.min.js public/
-          cp ort-wasm.wasm public/
-          cp ort-wasm-simd.wasm public/
 
-      - name: Capacitor Configuration
+      - name: Capacitor Configuration (МАГИЯ ЗДЕСЬ)
         run: |
           npx cap init "NeonReader" "com.neon.reader.pro" --web-dir public
-          # Разрешаем CORS и навигацию по любым сайтам (для парсера)
+          # Переписываем конфиг: включаем нативный обход CORS
           cat <<EOF > capacitor.config.json
           {
             "appId": "com.neon.reader.pro",
             "appName": "NeonReader",
             "webDir": "public",
             "bundledWebRuntime": false,
+            "plugins": {
+              "CapacitorHttp": {
+                "enabled": true
+              }
+            },
             "server": {
               "allowNavigation": ["*"],
               "cleartext": true
@@ -65,16 +66,17 @@ jobs:
           
       - name: Android Manifest Patch
         run: |
-          # Прописываем доступ к интернету и аудио
+          # Вшиваем нужные разрешения в систему Android
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' $MANIFEST
-          # Включаем hardware acceleration для плавности анимаций
+          # Ускоряем интерфейс через GPU
           sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:hardwareAccelerated="true"/' $MANIFEST
 
       - name: Create Release Key
         run: |
+          # Генерируем ключ для подписи APK
           keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias neon-key -storepass neon123 -keypass neon123 -dname "CN=NeonReader, O=Dev, C=RU"
 
       - name: Build & Sign APK
@@ -82,7 +84,7 @@ jobs:
           npx cap copy android
           cd android && chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
-          # Подпись APK
+          # Подписываем готовый APK
           SIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
           $SIGNER sign --ks ../release.jks --ks-key-alias neon-key --ks-pass pass:neon123 --key-pass pass:neon123 --out NeonReader_Signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
 
