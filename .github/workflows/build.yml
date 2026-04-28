@@ -1,7 +1,7 @@
 name: NeonReader Build PRO
 
 on:
-  workflow_dispatch: # Запуск по кнопке
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -26,19 +26,23 @@ jobs:
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/app @capacitor/browser @capacitor/share
-          # Ставим минификатор, чтобы код летал
           npm install html-minifier-terser
 
       - name: Prepare Web Content
         run: |
           mkdir -p public
-          # Сжимаем единственный index.html и кидаем в папку сборки
+          # Сжимаем HTML
           npx html-minifier-terser index.html --minify-js --collapse-whitespace --remove-comments --output public/index.html
+          
+          # ЖЕСТКО КОПИРУЕМ ТВОИ БИБЛИОТЕКИ В APK
+          cp ort.min.js public/ || true
+          cp ort-wasm.wasm public/ || true
+          cp ort-wasm-simd.wasm public/ || true
 
-      - name: Capacitor Configuration (МАГИЯ ЗДЕСЬ)
+      - name: Capacitor Configuration
         run: |
           npx cap init "NeonReader" "com.neon.reader.pro" --web-dir public
-          # Переписываем конфиг: включаем нативный обход CORS
+          # Включаем CapacitorHttp для прямого скачивания книг без прокси
           cat <<EOF > capacitor.config.json
           {
             "appId": "com.neon.reader.pro",
@@ -66,17 +70,14 @@ jobs:
           
       - name: Android Manifest Patch
         run: |
-          # Вшиваем нужные разрешения в систему Android
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' $MANIFEST
-          # Ускоряем интерфейс через GPU
           sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:hardwareAccelerated="true"/' $MANIFEST
 
       - name: Create Release Key
         run: |
-          # Генерируем ключ для подписи APK
           keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias neon-key -storepass neon123 -keypass neon123 -dname "CN=NeonReader, O=Dev, C=RU"
 
       - name: Build & Sign APK
@@ -84,7 +85,6 @@ jobs:
           npx cap copy android
           cd android && chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
-          # Подписываем готовый APK
           SIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
           $SIGNER sign --ks ../release.jks --ks-key-alias neon-key --ks-pass pass:neon123 --key-pass pass:neon123 --out NeonReader_Signed.apk app/build/outputs/apk/release/app-release-unsigned.apk
 
