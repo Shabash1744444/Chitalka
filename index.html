@@ -8,6 +8,8 @@
     <meta name="referrer" content="no-referrer">
     <title>NeonReader: Ultimate Cyberpunk Core</title>
     
+    <script src="ort.min.js"></script>
+    
     <style>
         :root {
             --bg-base: #0a0a0f;
@@ -276,7 +278,6 @@
             <select id="voice-engine-select" class="custom-input" style="margin-bottom: 10px;" onchange="app.checkModelStatus()">
                 <option value="google">Google TTS</option>
                 <option value="alisa">Yandex Alisa</option>
-                <option value="piper">Piper (Ирина - Beta)</option>
                 <option value="silero" selected>Silero (V4 RU)</option>
             </select>
             
@@ -345,8 +346,12 @@
 </footer>
 
 <script>
+// НАСТРОЙКИ ONNX - Указываем искать файлы прямо в папке приложения
+ort.env.logLevel = 'error';
+ort.env.wasm.numThreads = 1; 
+ort.env.wasm.wasmPaths = './'; 
+
 const MODEL_LINKS = {
-    piper: "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx",
     silero: "https://models.silero.ai/models/tts/ru/v4_ru.onnx"
 };
 
@@ -445,7 +450,7 @@ const app = {
         this.updateSiteTemplate();
         this.checkModelStatus();
 
-        // Авто-загрузка последней прочитанной главы
+        // Авто-загрузка
         const savedSession = localStorage.getItem('neon_pro_save');
         if(savedSession) {
             try {
@@ -697,7 +702,7 @@ const app = {
         }
     },
 
-    // Прямой быстрый парсер (обрыв мертвых прокси через 8 сек)
+    // Прямой парсер для сборки CapacitorHttp
     async networkFetchCore(url, site) {
         this.clearToasts(); 
         let t = this.logToast(`Загрузка главы...`, 'ok', 0);
@@ -707,8 +712,7 @@ const app = {
         
         const endpoints = [
             url, 
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
         ];
 
         for (let ep of endpoints) {
@@ -847,7 +851,6 @@ const app = {
             rawText = dbData.text;
             this.nextUrl = dbData.nextUrl;
             
-            // Фикс бага перевода: Если 10%+ текста на кириллице, он уже переведен!
             const ruChars = rawText.match(/[а-яА-ЯёЁ]/g);
             if (ruChars && ruChars.length > rawText.length * 0.1) {
                 isAlreadyTranslated = true;
@@ -926,133 +929,59 @@ const app = {
         const btn = document.getElementById('dl-model-btn');
         const label = document.getElementById('model-ok-label');
         
-        if (engine === 'piper' || engine === 'silero') {
+        if (engine === 'silero') {
             const stored = await NeonDB.getModel(engine);
-            const w1 = await NeonDB.getModel('ort-wasm.wasm');
-            btn.style.display = (stored && w1) ? 'none' : 'flex';
-            label.style.display = (stored && w1) ? 'block' : 'none';
+            btn.style.display = stored ? 'none' : 'flex';
+            label.style.display = stored ? 'block' : 'none';
         } else {
             btn.style.display = 'none'; label.style.display = 'none';
         }
     },
 
-    // Универсальная скачивалка с прокси-фоллбэком для файлов любого веса
-    async downloadFileViaProxy(targetUrl, progressCb) {
-        const endpoints = [
-            targetUrl, 
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
-        ];
-        let res = null;
-        for (let ep of endpoints) {
-            try {
-                const response = await fetch(ep);
-                if (response.ok) { res = response; break; }
-            } catch(e) {}
-        }
-        if (!res) throw new Error("Блокировка серверов");
-        
-        const reader = res.body.getReader();
-        let chunks = [];
-        let loaded = 0;
-        const total = parseInt(res.headers.get('content-length')) || 0;
-
-        while(true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            chunks.push(value);
-            loaded += value.length;
-            if (progressCb) progressCb(loaded, total);
-        }
-        return new Blob(chunks);
-    },
-
-    // АБСОЛЮТНО АВТОНОМНАЯ ЗАГРУЗКА ЯДРА И МОДЕЛИ
     async downloadLocalModel() {
         const engine = document.getElementById('voice-engine-select').value;
         const url = MODEL_LINKS[engine];
         if(!url) return this.logToast("Движок не поддерживается", "error");
         
         this.clearToasts();
-        let t = this.logToast(`Качаем автономное ядро...`, "ok", 0);
-        const span = t.querySelector('span');
+        let t = this.logToast(`Качаем голос [${engine}]...`, "ok", 0);
 
         try {
-            // 1. Движок JS
-            if (!(await NeonDB.getModel('ort.min.js'))) {
-                span.innerText = "Ядро ONNX (JS)...";
-                const bJs = await this.downloadFileViaProxy('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.min.js');
-                await NeonDB.saveModel('ort.min.js', bJs);
-            }
-            // 2. Ядро WASM
-            if (!(await NeonDB.getModel('ort-wasm.wasm'))) {
-                span.innerText = "Ядро ONNX (WASM)...";
-                const bW1 = await this.downloadFileViaProxy('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm.wasm');
-                await NeonDB.saveModel('ort-wasm.wasm', bW1);
-            }
-            // 3. Вычислитель SIMD
-            if (!(await NeonDB.getModel('ort-wasm-simd.wasm'))) {
-                span.innerText = "Ядро ONNX (SIMD)...";
-                const bW2 = await this.downloadFileViaProxy('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm-simd.wasm');
-                await NeonDB.saveModel('ort-wasm-simd.wasm', bW2);
-            }
+            // Прямой fetch через CapacitorHttp
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Сервер недоступен");
+            
+            const reader = res.body.getReader();
+            let chunks = [];
+            let loaded = 0;
+            const total = parseInt(res.headers.get('content-length')) || 45000000;
 
-            // 4. Нейросеть голоса
-            span.innerText = `Загрузка голоса... 0%`;
-            const modelBlob = await this.downloadFileViaProxy(url, (loaded, total) => {
-                let percent = total ? Math.min(Math.round((loaded/total)*100), 100) : Math.round(loaded/1024/1024) + 'MB';
-                span.innerText = `Загрузка голоса: ${percent}%`;
-            });
-            await NeonDB.saveModel(engine, modelBlob);
-
+            while(true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                loaded += value.length;
+                let percent = Math.min(Math.round((loaded/total)*100), 100);
+                t.querySelector('span').innerText = `Загрузка: ${percent}%`;
+            }
+            
+            await NeonDB.saveModel(engine, new Blob(chunks));
             t.remove();
-            this.logToast("СИСТЕМА ПОЛНОСТЬЮ АВТОНОМНА", "ok");
+            this.logToast("ГОЛОС УСТАНОВЛЕН", "ok");
             this.checkModelStatus();
         } catch(e) {
             t.remove();
-            this.logToast("Ошибка: " + e.message, "error");
-        }
-    },
-
-    // ПОДЪЕМ ЯДРА НА ЛЕТУ ИЗ БАЗЫ БЕЗ ИНТЕРНЕТА
-    async ensureOrtLoaded() {
-        if (typeof ort !== 'undefined') return;
-        const jsBlob = await NeonDB.getModel('ort.min.js');
-        if (!jsBlob) throw new Error("Ядро не скачано! Нажмите 'УСТАНОВИТЬ ГОЛОС'.");
-        
-        await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = URL.createObjectURL(new Blob([jsBlob], { type: 'application/javascript' }));
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-        
-        const w1 = await NeonDB.getModel('ort-wasm.wasm');
-        const w2 = await NeonDB.getModel('ort-wasm-simd.wasm');
-        if (w1 && w2) {
-            ort.env.wasm.numThreads = 1; 
-            ort.env.wasm.wasmPaths = {
-                'ort-wasm.wasm': URL.createObjectURL(new Blob([w1], { type: 'application/wasm' })),
-                'ort-wasm-simd.wasm': URL.createObjectURL(new Blob([w2], { type: 'application/wasm' }))
-            };
+            this.logToast("Сбой загрузки файла.", "error");
         }
     },
 
     async playOfflineModel(text, engine) {
-        if (engine === 'piper') {
-            this.logToast("Piper требует внешний C++ словарь. Включаю Silero...", "error");
-            engine = 'silero'; 
-        }
-
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.clearToasts();
-        let t = this.logToast(`Инициализация ИИ...`, "ok", 0);
+        
+        let t = this.logToast(`Нейронка думает...`, "ok", 0);
         
         try {
-            await this.ensureOrtLoaded();
-            t.querySelector('span').innerText = `Генерация звука...`;
-
             const blob = await NeonDB.getModel(engine);
             if (!blob) throw new Error("Сначала скачай голос в настройках!");
 
@@ -1088,7 +1017,7 @@ const app = {
             this.isPlaying = true; this.updateUI();
         } catch(e) {
             t.remove();
-            this.logToast("Сбой ИИ: " + e.message, "error");
+            this.logToast("Ошибка ИИ: " + e.message, "error");
             this.stop();
         }
     },
@@ -1103,11 +1032,11 @@ const app = {
             this.playGoogle(text);
         } else if (voice === 'alisa') {
             await this.playAlisa(text);
-        } else if (voice === 'piper' || voice === 'silero') {
+        } else if (voice === 'silero') {
             await this.playOfflineModel(text, voice);
         } else {
             this.clearToasts();
-            this.logToast(`Модуль ${voice.toUpperCase()} не поддерживается!`, "error");
+            this.logToast(`Модуль не поддерживается!`, "error");
             this.stop();
         }
     },
