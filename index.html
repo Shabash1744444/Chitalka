@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="referrer" content="no-referrer">
     <title>NeonReader: Ultimate Cyberpunk Core</title>
-    <script src="ort.min.js"></script>
+    
     <style>
         :root {
             --bg-base: #0a0a0f;
@@ -109,7 +109,6 @@
         #library-room.show { opacity: 1; display: flex; }
         .lib-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top) + 20px) 20px 15px; border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
         
-        /* ОБНОВЛЕННАЯ БИБЛИОТЕКА */
         .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 20px; overflow-y: auto; flex: 1; }
         .book-card { background: rgba(255,255,255,0.03); border-radius: 20px; position: relative; transition: 0.3s; display: flex; flex-direction: column; height: 360px; border: 1px solid var(--glass-border); overflow: hidden; }
         .book-card.downloading { border-color: var(--theme-hex); box-shadow: 0 0 25px rgba(var(--theme-rgb), 0.4); }
@@ -277,7 +276,8 @@
             <select id="voice-engine-select" class="custom-input" style="margin-bottom: 10px;" onchange="app.checkModelStatus()">
                 <option value="google">Google TTS</option>
                 <option value="alisa">Yandex Alisa</option>
-                <option value="silero">Silero (V4 RU)</option>
+                <option value="piper">Piper (Ирина - Beta)</option>
+                <option value="silero" selected>Silero (V4 RU)</option>
             </select>
             
             <div class="setting-row" style="margin-bottom: 12px; background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05);">
@@ -287,9 +287,9 @@
             </div>
 
             <button id="dl-model-btn" class="action-btn btn-main" style="width: 100%; display: none;" onclick="app.downloadLocalModel()">
-                УСТАНОВИТЬ ГОЛОС (~60MB)
+                УСТАНОВИТЬ ГОЛОС
             </button>
-            <div id="model-ok-label" style="display: none; color: var(--success); font-size: 11px; font-weight: 800; text-align: center;">✅ ГОЛОС В ПАМЯТИ</div>
+            <div id="model-ok-label" style="display: none; color: var(--success); font-size: 11px; font-weight: 800; text-align: center; margin-top: 5px;">✅ АВТОНОМНОЕ ЯДРО В ПАМЯТИ</div>
         </div>
 
         <div class="settings-section">
@@ -345,16 +345,12 @@
 </footer>
 
 <script>
-// Настройки ядра ONNX для автономной работы в APK
-ort.env.logLevel = 'error';
-ort.env.wasm.numThreads = 1; 
-ort.env.wasm.wasmPaths = './'; 
-
 const MODEL_LINKS = {
+    piper: "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx",
     silero: "https://models.silero.ai/models/tts/ru/v4_ru.onnx"
 };
 
-// Токены для оффлайн ИИ синтезатора Silero
+// Вшитые токены для Silero V4
 const SILERO_TOKENS = {" ": 1, "!": 2, "-": 3, ".": 4, "0": 5, "1": 6, "2": 7, "3": 8, "4": 9, "5": 10, "6": 11, "7": 12, "8": 13, "9": 14, "?": 15, "а": 16, "б": 17, "в": 18, "г": 19, "д": 20, "е": 21, "ж": 22, "з": 23, "и": 24, "й": 25, "к": 26, "л": 27, "м": 28, "н": 29, "о": 30, "п": 31, "р": 32, "с": 33, "т": 34, "у": 35, "ф": 36, "х": 37, "ц": 38, "ч": 39, "ш": 40, "щ": 41, "ъ": 42, "ы": 43, "ь": 44, "э": 45, "ю": 46, "я": 47, "ё": 48};
 
 const NeonDB = {
@@ -701,57 +697,52 @@ const app = {
         }
     },
 
+    // Прямой быстрый парсер (обрыв мертвых прокси через 8 сек)
     async networkFetchCore(url, site) {
+        this.clearToasts(); 
+        let t = this.logToast(`Загрузка главы...`, 'ok', 0);
+        
+        let html = "";
+        let success = false;
+        
         const endpoints = [
             url, 
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-            `https://corsproxy.io/?${encodeURIComponent(url)}`,
             `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
         ];
 
-        let html = "";
-        let success = false;
-        let lastError = "";
-
-        for (let i = 0; i < endpoints.length; i++) {
-            this.clearToasts(); 
-            const proxyName = i === 0 ? "Прямое соединение" : new URL(endpoints[i]).hostname;
-            let t = this.logToast(`Проверка: ${proxyName}...`, 'ok', 0);
-            
+        for (let ep of endpoints) {
             try {
-                const res = await fetch(endpoints[i]);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+                
+                const res = await fetch(ep, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
                 let text = await res.text();
                     
                 if (text.trim().startsWith('{') && text.includes('"contents"')) {
                     try { text = JSON.parse(text).contents; } catch(e){}
                 }
 
-                const isCloudflare = text.includes('<title>Just a moment...</title>') || 
-                                     text.includes('id="challenge-running"');
-
-                if (isCloudflare) {
+                if (text.includes('<title>Just a moment...</title>') || text.includes('id="challenge-running"')) {
                     t.remove();
                     this.openCaptchaModal(url);
-                    throw new Error("Требуется обход защиты (Cloudflare). Ожидание действий пользователя.");
+                    throw new Error("BLOCK_CLOUDFLARE");
                 }
 
                 if (res.ok && text.length > 500) {
                     html = text;
                     success = true;
-                    t.remove();
-                    this.logToast(`Установлено!`, 'ok', 1000);
                     break;
-                } else {
-                    lastError = `Пустой ответ или статус ${res.status}`;
                 }
             } catch(e) {
-                if (e.message.includes("Требуется обход защиты")) throw e;
-                lastError = e.message; 
+                if (e.message === "BLOCK_CLOUDFLARE") throw e;
             }
-            t.remove();
         }
 
-        if (!success) throw new Error(`Сбой: ${lastError}`);
+        t.remove();
+        if (!success) throw new Error("Сбой: Таймаут или сайт не отвечает.");
 
         const doc = new DOMParser().parseFromString(html, 'text/html');
         let sel = 'p';
@@ -762,18 +753,23 @@ const app = {
 
         let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(t => t.length > 20);
         if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t.length > 30);
-        if (paras.length === 0) throw new Error("Текст не найден. Структура сайта изменилась.");
+        if (paras.length === 0) throw new Error("Текст не найден.");
 
         let nUrl = null;
         Array.from(doc.querySelectorAll('a')).forEach(a => {
-            const text = a.innerText.toLowerCase();
-            if (text.includes('next') || text.includes('следующая') || text.includes('вперед')) {
+            const linkText = a.innerText.toLowerCase();
+            if (linkText.includes('next') || linkText.includes('следующая') || linkText.includes('вперед')) {
                 const href = a.getAttribute('href');
                 if (href && href !== '#') nUrl = new URL(href, url).href;
             }
         });
         
-        return { text: paras.join('\n\n'), nextUrl: nUrl, title: doc.querySelector('title')?.innerText || "", cover: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || "" };
+        return { 
+            text: paras.join('\n\n'), 
+            nextUrl: nUrl, 
+            title: doc.querySelector('title')?.innerText || "", 
+            cover: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || "" 
+        };
     },
 
     async startDownload(id) {
@@ -836,19 +832,18 @@ const app = {
         this.clearToasts();
         const url = document.getElementById('url-input').value;
         const mode = document.getElementById('mode-select').value; 
-        this.ensureSiteInList(url); 
         const site = document.getElementById('site-select').value;
 
         let rawText = "";
         let isAlreadyTranslated = false;
         this.currentBookMetadata = { title: '', cover: '' };
             
-        let tDb = this.logToast("Проверка локальной базы NeonDB...", "ok", 0);
+        let tDb = this.logToast("Проверка кэша...", "ok", 0);
         const dbData = await NeonDB.getChapter(url);
         
         if (dbData) {
             tDb.remove();
-            this.logToast("Текст извлечен из памяти", "ok");
+            this.logToast("Извлечено из памяти", "ok");
             rawText = dbData.text;
             this.nextUrl = dbData.nextUrl;
             
@@ -874,7 +869,7 @@ const app = {
 
         if (mode === "translate" && !isAlreadyTranslated) {
             this.clearToasts();
-            let tTr = this.logToast("Нейроперевод активирован...", "ok", 0);
+            let tTr = this.logToast("Нейроперевод...", "ok", 0);
             try {
                 const translatedText = await this.translate(rawText);
                 this.render(translatedText);
@@ -886,7 +881,7 @@ const app = {
             }
         } else {
             this.clearToasts();
-            let msg = isAlreadyTranslated ? "Открыт русский кэш..." : "Очистка оригинала...";
+            let msg = isAlreadyTranslated ? "Открыт русский текст..." : "Очистка оригинала...";
             let tOr = this.logToast(msg, "ok", 0);
             this.render(rawText);
             tOr.remove();
@@ -931,56 +926,133 @@ const app = {
         const btn = document.getElementById('dl-model-btn');
         const label = document.getElementById('model-ok-label');
         
-        if (engine === 'silero') {
+        if (engine === 'piper' || engine === 'silero') {
             const stored = await NeonDB.getModel(engine);
-            btn.style.display = stored ? 'none' : 'flex';
-            label.style.display = stored ? 'block' : 'none';
+            const w1 = await NeonDB.getModel('ort-wasm.wasm');
+            btn.style.display = (stored && w1) ? 'none' : 'flex';
+            label.style.display = (stored && w1) ? 'block' : 'none';
         } else {
             btn.style.display = 'none'; label.style.display = 'none';
         }
     },
 
+    // Универсальная скачивалка с прокси-фоллбэком для файлов любого веса
+    async downloadFileViaProxy(targetUrl, progressCb) {
+        const endpoints = [
+            targetUrl, 
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+        ];
+        let res = null;
+        for (let ep of endpoints) {
+            try {
+                const response = await fetch(ep);
+                if (response.ok) { res = response; break; }
+            } catch(e) {}
+        }
+        if (!res) throw new Error("Блокировка серверов");
+        
+        const reader = res.body.getReader();
+        let chunks = [];
+        let loaded = 0;
+        const total = parseInt(res.headers.get('content-length')) || 0;
+
+        while(true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            loaded += value.length;
+            if (progressCb) progressCb(loaded, total);
+        }
+        return new Blob(chunks);
+    },
+
+    // АБСОЛЮТНО АВТОНОМНАЯ ЗАГРУЗКА ЯДРА И МОДЕЛИ
     async downloadLocalModel() {
         const engine = document.getElementById('voice-engine-select').value;
         const url = MODEL_LINKS[engine];
-        if(!url) return this.logToast("Движок не поддерживается оффлайн", "error");
+        if(!url) return this.logToast("Движок не поддерживается", "error");
         
         this.clearToasts();
-        let t = this.logToast(`Загрузка ИИ-голоса [${engine}]...`, "ok", 0);
-        
-        try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Сервер недоступен");
-            const reader = res.body.getReader();
-            let chunks = [];
-            let loaded = 0;
-            const total = parseInt(res.headers.get('content-length')) || 60000000;
+        let t = this.logToast(`Качаем автономное ядро...`, "ok", 0);
+        const span = t.querySelector('span');
 
-            while(true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                chunks.push(value);
-                loaded += value.length;
-                t.querySelector('span').innerText = `Загрузка: ${Math.round((loaded/total)*100)}%`;
+        try {
+            // 1. Движок JS
+            if (!(await NeonDB.getModel('ort.min.js'))) {
+                span.innerText = "Ядро ONNX (JS)...";
+                const bJs = await this.downloadFileViaProxy('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.min.js');
+                await NeonDB.saveModel('ort.min.js', bJs);
             }
-            
-            await NeonDB.saveModel(engine, new Blob(chunks));
+            // 2. Ядро WASM
+            if (!(await NeonDB.getModel('ort-wasm.wasm'))) {
+                span.innerText = "Ядро ONNX (WASM)...";
+                const bW1 = await this.downloadFileViaProxy('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm.wasm');
+                await NeonDB.saveModel('ort-wasm.wasm', bW1);
+            }
+            // 3. Вычислитель SIMD
+            if (!(await NeonDB.getModel('ort-wasm-simd.wasm'))) {
+                span.innerText = "Ядро ONNX (SIMD)...";
+                const bW2 = await this.downloadFileViaProxy('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort-wasm-simd.wasm');
+                await NeonDB.saveModel('ort-wasm-simd.wasm', bW2);
+            }
+
+            // 4. Нейросеть голоса
+            span.innerText = `Загрузка голоса... 0%`;
+            const modelBlob = await this.downloadFileViaProxy(url, (loaded, total) => {
+                let percent = total ? Math.min(Math.round((loaded/total)*100), 100) : Math.round(loaded/1024/1024) + 'MB';
+                span.innerText = `Загрузка голоса: ${percent}%`;
+            });
+            await NeonDB.saveModel(engine, modelBlob);
+
             t.remove();
-            this.logToast("ГОЛОС УСТАНОВЛЕН", "ok");
+            this.logToast("СИСТЕМА ПОЛНОСТЬЮ АВТОНОМНА", "ok");
             this.checkModelStatus();
         } catch(e) {
             t.remove();
-            this.logToast("Сбой сети: " + e.message, "error");
+            this.logToast("Ошибка: " + e.message, "error");
+        }
+    },
+
+    // ПОДЪЕМ ЯДРА НА ЛЕТУ ИЗ БАЗЫ БЕЗ ИНТЕРНЕТА
+    async ensureOrtLoaded() {
+        if (typeof ort !== 'undefined') return;
+        const jsBlob = await NeonDB.getModel('ort.min.js');
+        if (!jsBlob) throw new Error("Ядро не скачано! Нажмите 'УСТАНОВИТЬ ГОЛОС'.");
+        
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = URL.createObjectURL(new Blob([jsBlob], { type: 'application/javascript' }));
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+        
+        const w1 = await NeonDB.getModel('ort-wasm.wasm');
+        const w2 = await NeonDB.getModel('ort-wasm-simd.wasm');
+        if (w1 && w2) {
+            ort.env.wasm.numThreads = 1; 
+            ort.env.wasm.wasmPaths = {
+                'ort-wasm.wasm': URL.createObjectURL(new Blob([w1], { type: 'application/wasm' })),
+                'ort-wasm-simd.wasm': URL.createObjectURL(new Blob([w2], { type: 'application/wasm' }))
+            };
         }
     },
 
     async playOfflineModel(text, engine) {
+        if (engine === 'piper') {
+            this.logToast("Piper требует внешний C++ словарь. Включаю Silero...", "error");
+            engine = 'silero'; 
+        }
+
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.clearToasts();
-        
-        let t = this.logToast(`Нейронка думает...`, "ok", 0);
+        let t = this.logToast(`Инициализация ИИ...`, "ok", 0);
         
         try {
+            await this.ensureOrtLoaded();
+            t.querySelector('span').innerText = `Генерация звука...`;
+
             const blob = await NeonDB.getModel(engine);
             if (!blob) throw new Error("Сначала скачай голос в настройках!");
 
@@ -1016,7 +1088,7 @@ const app = {
             this.isPlaying = true; this.updateUI();
         } catch(e) {
             t.remove();
-            this.logToast("Ошибка ИИ: " + e.message, "error");
+            this.logToast("Сбой ИИ: " + e.message, "error");
             this.stop();
         }
     },
@@ -1031,7 +1103,7 @@ const app = {
             this.playGoogle(text);
         } else if (voice === 'alisa') {
             await this.playAlisa(text);
-        } else if (voice === 'silero') {
+        } else if (voice === 'piper' || voice === 'silero') {
             await this.playOfflineModel(text, voice);
         } else {
             this.clearToasts();
@@ -1062,7 +1134,7 @@ const app = {
         } 
         catch (e) {
             try {
-                const proxies = [`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`, `https://corsproxy.io/?${encodeURIComponent(ttsUrl)}`];
+                const proxies = [`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`];
                 let success = false;
                 for (let p of proxies) {
                     try { 
