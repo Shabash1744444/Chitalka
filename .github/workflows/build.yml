@@ -33,6 +33,11 @@ jobs:
           mkdir -p public
           # Сжимаем твой HTML для скорости работы на телефоне
           npx html-minifier-terser index.html --minify-js --collapse-whitespace --remove-comments --output public/index.html
+          
+          # КОПИРУЕМ ЯДРО НЕЙРОСЕТИ В ПАПКУ СБОРКИ
+          cp ort.min.js public/
+          cp ort-wasm.wasm public/
+          cp ort-wasm-simd.wasm public/
 
       - name: Capacitor Configuration
         run: |
