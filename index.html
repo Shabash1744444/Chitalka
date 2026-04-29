@@ -504,9 +504,16 @@ const app = {
         this.loadSitesData();
         this.loadLibraryData();
         
-        const loadVoices = () => { this.voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('ru')); };
+        // ПРЕДОХРАНИТЕЛЬ ДЛЯ GOOGLE VOICES (Спасает от краша в АПК)
+        const loadVoices = () => { 
+            if (window.speechSynthesis) {
+                this.voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('ru')); 
+            }
+        };
         loadVoices();
-        if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+        if (window.speechSynthesis && window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
         
         this.audio.onended = () => {
             if(this.audio.src.includes('blob:')) URL.revokeObjectURL(this.audio.src);
@@ -1201,13 +1208,20 @@ const app = {
 
     playGoogle(text) {
         console.log("Google TTS старт.");
-        window.speechSynthesis.cancel();
-        const utt = new SpeechSynthesisUtterance(text); utt.lang = 'ru-RU';
-        utt.rate = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
-        if (this.voices.length > 0) utt.voice = this.voices.find(v => v.name.includes('Google') || v.name.includes('ru-RU')) || this.voices[0];
-        utt.onend = () => { if (this.isPlaying) this.jump(1); };
-        window.speechSynthesis.speak(utt);
-        this.isPlaying = true; this.updateUI();
+        // ПРЕДОХРАНИТЕЛЬ ДЛЯ GOOGLE
+        if(window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(text); utt.lang = 'ru-RU';
+            utt.rate = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
+            if (this.voices.length > 0) utt.voice = this.voices.find(v => v.name.includes('Google') || v.name.includes('ru-RU')) || this.voices[0];
+            utt.onend = () => { if (this.isPlaying) this.jump(1); };
+            window.speechSynthesis.speak(utt);
+            this.isPlaying = true; this.updateUI();
+        } else {
+            console.error("SpeechSynthesis недоступен в этой среде.");
+            this.logToast("Google TTS отключен в системе", "error");
+            this.stop();
+        }
     },
 
     async playAlisa(text) {
@@ -1254,7 +1268,9 @@ const app = {
         if (this.isPlaying) { 
             console.log("Кнопка: Пауза");
             if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
-            this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; 
+            this.audio.pause(); 
+            if(window.speechSynthesis) window.speechSynthesis.cancel(); 
+            this.isPlaying = false; 
         } 
         else { 
             console.log("Кнопка: Плей");
@@ -1266,7 +1282,10 @@ const app = {
     stop() { 
         console.log("Полная остановка.");
         if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
-        this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; this.updateUI(); 
+        this.audio.pause(); 
+        if(window.speechSynthesis) window.speechSynthesis.cancel(); 
+        this.isPlaying = false; 
+        this.updateUI(); 
     },
     jump(delta) { this.play(this.currentIndex + delta); },
     seekProgress(e) { if(!this.sents.length) return; const rect = e.currentTarget.getBoundingClientRect(); this.play(Math.floor(this.sents.length * ((e.clientX - rect.left) / rect.width))); },
