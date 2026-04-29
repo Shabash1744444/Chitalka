@@ -27,6 +27,8 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/app @capacitor/browser @capacitor/share
           npm install html-minifier-terser
+          # УСТАНАВЛИВАЕМ ПЛАГИН ДЛЯ ФОНОВОГО ЗВУКА
+          npm install cordova-plugin-background-mode
 
       - name: Prepare Web Content
         run: |
@@ -34,7 +36,7 @@ jobs:
           # Сжимаем HTML
           npx html-minifier-terser index.html --minify-js --collapse-whitespace --remove-comments --output public/index.html
           
-          # ЖЕСТКО КОПИРУЕМ ТВОИ БИБЛИОТЕКИ В APK
+          # КОПИРУЕМ БИБЛИОТЕКИ В APK
           cp ort.min.js public/ || true
           cp ort-wasm.wasm public/ || true
           cp ort-wasm-simd.wasm public/ || true
@@ -74,7 +76,10 @@ jobs:
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' $MANIFEST
-          # ВАЖНО: Добавил usesCleartextTraffic (для загрузки с любых сайтов) и largeHeap (чтобы нейронка не крашила память)
+          # ПРАВА ДЛЯ ФОНОВОЙ РАБОТЫ АНДРОИДА
+          sed -i '/<application/i <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+          sed -i '/<application/i <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />' $MANIFEST
+          # ВАЖНО: Добавил usesCleartextTraffic и largeHeap
           sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:usesCleartextTraffic="true" android:largeHeap="true" android:hardwareAccelerated="true"/' $MANIFEST
 
       - name: Create Release Key
@@ -83,7 +88,7 @@ jobs:
 
       - name: Build & Sign APK
         run: |
-          # ИСПОЛЬЗУЕМ SYNC ВМЕСТО COPY, ЧТОБЫ ПЛАГИНЫ ТОЧНО ВШИЛИСЬ
+          # SYNC СКОПИРУЕТ НАШ НОВЫЙ ФОНОВЫЙ ПЛАГИН В ANDROID
           npx cap sync android
           cd android && chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
