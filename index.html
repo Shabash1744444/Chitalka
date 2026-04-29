@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="referrer" content="no-referrer">
-    <title>NeonReader: PRO Debug Edition</title>
+    <title>NeonReader: Ultimate PRO</title>
     
     <script>
         window.appLogs = [];
@@ -36,10 +36,12 @@
             originalLog.apply(console, args);
             printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#0f0');
         };
+
         console.warn = function(...args) {
             originalWarn.apply(console, args);
             printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#ff0');
         };
+
         console.error = function(...args) {
             originalError.apply(console, args);
             printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#f00');
@@ -49,15 +51,10 @@
             console.error(`КРАШ JS: ${msg} на строке ${line}`);
             return false;
         };
+
         window.onunhandledrejection = function(event) {
             console.error(`ТИХАЯ ОШИБКА (Promise): ${event.reason}`);
         };
-    </script>
-    
-    <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
-        env.backends.onnx.wasm.numThreads = 1;
-        window.NeuralTTS = { pipeline };
     </script>
     
     <style>
@@ -66,6 +63,7 @@
             --text-color: #f1f5f9;
             --theme-hex: #a855f7; 
             --theme-rgb: 168, 85, 247;
+            --theme-cached-hex: #10b981; 
             --glow-int: 1; 
             
             --glass-panel: rgba(15, 15, 22, 0.75);
@@ -103,7 +101,6 @@
         .icon-sm { width: 16px; height: 16px; }
         .icon-fill { fill: currentColor; stroke: none; }
 
-        /* Консоль Разработчика */
         #dev-console-modal {
             display: none; position: fixed; inset: 0; z-index: 999999;
             background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); flex-direction: column;
@@ -124,6 +121,7 @@
         .toast.error { border-color: var(--danger); box-shadow: 0 8px 20px rgba(0,0,0,0.8), 0 0 calc(15px * var(--glow-int)) rgba(239, 68, 68, 0.5); }
         .toast.fadeOut { animation: fadeOut 0.3s ease forwards; }
         .toast-close { background: none; border: none; color: var(--subtext); cursor: pointer; padding: 4px; display: flex; align-items: center; }
+
         @keyframes toastSlideDown { from { opacity: 0; transform: translateY(-20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px) scale(0.9); } }
 
@@ -171,11 +169,11 @@
         .lib-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top) + 20px) 20px 15px; border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
         
         .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 20px; overflow-y: auto; flex: 1; }
-        .book-card { background: rgba(255,255,255,0.03); border-radius: 20px; position: relative; transition: 0.3s; display: flex; flex-direction: column; height: 360px; border: 1px solid var(--glass-border); overflow: hidden; }
+        .book-card { background: rgba(255,255,255,0.03); border-radius: 20px; position: relative; transition: 0.3s; display: flex; flex-direction: column; height: auto; min-height: 360px; border: 1px solid var(--glass-border); overflow: hidden; }
         .book-card.downloading { border-color: var(--theme-hex); box-shadow: 0 0 25px rgba(var(--theme-rgb), 0.4); }
         .book-card.downloaded { border-color: var(--theme-hex); }
         .book-content { display: flex; flex-direction: column; height: 100%; }
-        .book-cover { width: 100%; height: 240px; object-fit: cover; background: #000; transition: 0.5s; }
+        .book-cover { width: 100%; height: 200px; object-fit: cover; background: #000; transition: 0.5s; }
         .book-card:hover .book-cover { transform: scale(1.05); }
         .download-badge { position: absolute; top: 12px; right: 12px; background: var(--theme-hex); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 900; z-index: 5; box-shadow: 0 0 15px rgba(0,0,0,0.5); display: none; }
         .book-card.downloading .download-badge { display: block; }
@@ -186,7 +184,6 @@
         #settings-modal.show .settings-content { transform: scale(1) translateY(0); }
         .settings-header { display: flex; justify-content: space-between; align-items: center; font-size: 16px; font-weight: 700; color: var(--text-color); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
         .settings-section { background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); padding: 12px; border-radius: 12px; }
-
         .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .setting-label { font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase; }
         input[type="color"] { -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; padding: 0; background: none; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); }
@@ -197,18 +194,23 @@
         main { flex: 1; overflow-y: auto; padding: 10px 15px 180px 15px; line-height: 1.7; font-size: 18px; scroll-behavior: smooth; position: relative; }
         main::after { content: ''; position: fixed; bottom: 0; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, var(--bg-base)); pointer-events: none; z-index: 1; }
         
-        .paragraph { margin-bottom: 20px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .paragraph { margin-bottom: 6px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
         .sentence { cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; position: relative; }
         .sentence.active { background: rgba(var(--theme-rgb), 0.2); color: var(--text-color); font-weight: 600; text-shadow: 0 0 calc(8px * var(--glow-int)) var(--theme-hex); display: inline-block; z-index: 2; border-bottom: 1px solid var(--theme-hex); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.3); }
-
+        
         footer { 
             position: fixed; bottom: calc(env(safe-area-inset-bottom) + 15px); left: 50%; transform: translateX(-50%); 
             width: 94%; max-width: 450px; border-radius: 20px; padding: 12px 15px; z-index: 100; 
         }
-        .progress-container { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 12px; overflow: hidden; cursor: pointer; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
-        #progress-fill { height: 100%; background: var(--theme-hex); width: 0%; transition: width 0.2s ease-out; box-shadow: 0 0 calc(10px * var(--glow-int)) var(--theme-hex); }
+
+        .progress-container { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 12px; overflow: hidden; position: relative; cursor: pointer; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
+        #progress-cached { position: absolute; top: 0; left: 0; height: 100%; background: var(--theme-cached-hex); width: 0%; opacity: 0.4; box-shadow: 0 0 10px var(--theme-cached-hex); transition: width 0.5s; z-index: 1; }
+        #progress-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--theme-hex); width: 0%; transition: width 0.2s ease-out; box-shadow: 0 0 calc(10px * var(--glow-int)) var(--theme-hex); z-index: 2; }
         
+        .chapter-marker { position: absolute; top: 0; width: 2px; height: 100%; background-color: #fff; opacity: 0.8; z-index: 5; }
+
         .player-controls { display: flex; justify-content: space-between; align-items: center; }
         .player-nav { display: flex; gap: 15px; align-items: center; }
         
@@ -224,24 +226,18 @@
         .icon-btn { background: none; color: var(--text-color); border: none; padding: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; opacity: 0.7; cursor: pointer; transition: 0.2s; }
         .icon-btn:active { opacity: 1; transform: scale(0.85); color: var(--theme-hex); filter: drop-shadow(0 0 calc(5px * var(--glow-int)) var(--theme-hex)); }
         .info-text { font-size: 11px; color: var(--subtext); font-variant-numeric: tabular-nums; font-weight: 600; width: 35px; text-align: left; }
-
+        
         #captcha-modal {
-            display: none; 
-            position: fixed; 
-            inset: 0; 
-            background: rgba(0,0,0,0.95); 
-            z-index: 99999; 
-            flex-direction: column; 
-            padding: calc(env(safe-area-inset-top) + 20px) 15px 20px 15px;
-            backdrop-filter: blur(15px);
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 99999; flex-direction: column; 
+            padding: calc(env(safe-area-inset-top) + 20px) 15px 20px 15px; backdrop-filter: blur(15px);
         }
         .captcha-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
         .captcha-title { color:var(--theme-hex); font-size: 15px; display:flex; align-items:center; gap:8px; font-weight:bold; text-shadow: 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
         .captcha-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); border:1px solid var(--glass-border); border-radius:12px; padding:20px; text-align:center; box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
     </style>
 </head>
-<body>
 
+<body>
 <div id="bg-glow"></div>
 <div id="toast-container"></div>
 
@@ -290,7 +286,7 @@
         </div>
         <div class="tools">
             <button class="action-btn btn-icon" onclick="document.getElementById('dev-console-modal').style.display='flex'" title="Логи">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
             <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
@@ -340,15 +336,23 @@
             <div class="setting-row"><span class="setting-label">Цвет свечения</span><input type="color" id="cfg-theme" onchange="app.updateSettings()"></div>
             <div class="setting-row"><span class="setting-label">Цвет фона</span><input type="color" id="cfg-bg" onchange="app.updateSettings()"></div>
             <div class="setting-row"><span class="setting-label">Цвет текста</span><input type="color" id="cfg-text" onchange="app.updateSettings()"></div>
+            <div class="setting-row"><span class="setting-label">Шрифт</span>
+                <select id="cfg-font" class="custom-input" style="width:130px; font-weight:bold; color:var(--theme-hex);" onchange="app.updateSettings()">
+                    <option value='-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'>Системный</option>
+                    <option value='Georgia, serif'>Книжный (Serif)</option>
+                    <option value='"Roboto", sans-serif'>Roboto</option>
+                    <option value='"Courier New", monospace'>Monospace</option>
+                </select>
+            </div>
+            <div class="setting-row"><span class="setting-label">Цвет кэша (Оффлайн слой)</span><input type="color" id="cfg-cached" onchange="app.updateSettings()"></div>
             <div class="setting-row"><span class="setting-label">Сила свечения</span><input type="range" id="cfg-glow" min="0" max="2" step="0.1" onchange="app.updateSettings()"></div>
         </div>
 
         <div class="settings-section">
-            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase;">Нейросетевой звук (OFFLINE)</div>
-            <select id="voice-engine-select" class="custom-input" style="margin-bottom: 10px;" onchange="app.checkModelStatus()">
-                <option value="google">Google TTS</option>
-                <option value="alisa">Yandex Alisa</option>
-                <option value="vits" selected>VITS (MMS Rus)</option>
+            <div style="font-size: 11px; color: var(--theme-hex); margin-bottom: 12px; font-weight: 800; text-transform: uppercase;">Голосовой движок</div>
+            <select id="voice-engine-select" class="custom-input" style="margin-bottom: 10px;" onchange="app.updateSettings()">
+                <option value="quality">Google Premium (Онлайн)</option>
+                <option value="offline" selected>Системный голос (Оффлайн)</option>
             </select>
             
             <div class="setting-row" style="margin-bottom: 12px; background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05);">
@@ -356,11 +360,11 @@
                 <input type="range" id="voice-speed" min="0.5" max="2.0" step="0.1" value="1.0" onchange="app.updateSettings()" oninput="document.getElementById('speed-val').innerText = parseFloat(this.value).toFixed(1) + 'x'">
                 <span id="speed-val" style="font-size:12px; font-weight:900; width:35px; text-align:right; font-family:monospace; color:var(--theme-hex);">1.0x</span>
             </div>
-
-            <button id="dl-model-btn" class="action-btn btn-main" style="width: 100%; display: none;" onclick="app.downloadLocalModel()">
-                СКАЧАТЬ VITS (35 МБ)
-            </button>
-            <div id="model-ok-label" style="display: none; color: var(--success); font-size: 11px; font-weight: 800; text-align: center; margin-top: 5px;">✅ VITS ЯДРО В ПАМЯТИ</div>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; padding: 0 5px;">
+                <label style="font-size:12px; font-weight:bold; color:var(--subtext);">АВТОПОВТОР СЕТИ</label>
+                <input type="checkbox" id="cfg-autoresume" style="width:20px; height:20px; accent-color: var(--theme-hex);" checked onchange="app.updateSettings()">
+            </div>
         </div>
 
         <div class="settings-section">
@@ -378,12 +382,15 @@
 <main id="reader-container">
     <div style="text-align: center; color: var(--subtext); margin-top: 60px; font-weight: 500;">
         <svg style="width:48px; height:48px; opacity:0.3; margin-bottom:10px; stroke:var(--theme-hex);" viewBox="0 0 24 24" fill="none" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><br>
-        <span style="font-size: 14px;">Система ожидает загрузку...</span>
+        <span style="font-size: 14px;">Система ожидает текст...</span>
     </div>
 </main>
 
 <footer class="glass">
-    <div class="progress-container" onclick="app.seekProgress(event)"><div id="progress-fill"></div></div>
+    <div class="progress-container" onclick="app.seekProgress(event)">
+        <div id="progress-cached"></div>
+        <div id="progress-fill"></div>
+    </div>
     <div class="player-controls">
         <div style="display: flex; gap: 5px;">
             <button class="icon-btn" onclick="app.saveBookmark()" title="Сохранить закладку">
@@ -401,31 +408,21 @@
             <button class="play-btn" id="play-btn" onclick="app.togglePlay()">
                 <svg class="icon-fill" style="width:22px;height:22px;margin-left:3px;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             </button>
-            <button class="icon-btn" onclick="app.jump(1)">
+            <button class="icon-btn" onclick="app.nextChapter(true)" title="Следующая глава (Добавить)">
                 <svg class="icon-fill" style="width:20px;height:20px;" viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
             </button>
         </div>
 
         <div style="display: flex; gap: 5px; align-items: center;">
             <div id="counter" style="font-size: 10px; color: var(--subtext); font-family: monospace; font-weight: bold; width: 30px; text-align: right;">0/0</div>
-            <button class="icon-btn" onclick="app.nextChapter()" title="Следующая глава">
-                <svg class="icon-fill" style="width:14px;height:14px; color:var(--text-color);" viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+            <button class="icon-btn" onclick="app.processChapter(null, false)" title="Обновить с нуля">
+                <svg class="icon-fill" style="width:14px;height:14px; color:var(--text-color);" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.22-10.27l-5.32 5.32"></path></svg>
             </button>
         </div>
     </div>
 </footer>
 
 <script>
-// Выводим накопленные логи при старте
-window.onload = async () => {
-    const list = document.getElementById('dev-console-list');
-    window.appLogs.forEach(l => printToDevConsole(l.msg, l.color));
-    window.appLogs = [];
-    
-    console.log("=== ИНИЦИАЛИЗАЦИЯ NEON READER ===");
-    await app.init();
-};
-
 // УБИВАЕМ ЗАСТРЯВШИЙ СЕРВИС-ВОРКЕР
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -433,25 +430,29 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// === БАЗА ДАННЫХ INDEXED DB ===
 const NeonDB = {
     db: null,
     async init() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open("NeonReaderDB", 3);
+            const req = indexedDB.open("NeonReaderDB", 12);
             req.onupgradeneeded = (e) => {
                 this.db = e.target.result;
                 if (!this.db.objectStoreNames.contains("chapters")) {
                     this.db.createObjectStore("chapters", { keyPath: "url" });
+                }
+                if (!this.db.objectStoreNames.contains("books")) {
+                    this.db.createObjectStore("books", { keyPath: "id" });
                 }
             };
             req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
             req.onerror = (e) => reject(e);
         });
     },
-    async saveChapter(url, bookId, text, nextUrl) {
+    async saveChapter(url, bookId, text, nextUrl, prevUrl) {
         return new Promise((resolve) => {
             const tx = this.db.transaction("chapters", "readwrite");
-            tx.objectStore("chapters").put({ url, bookId, text, nextUrl });
+            tx.objectStore("chapters").put({ url, bookId, text, nextUrl, prevUrl });
             tx.oncomplete = () => resolve();
         });
     },
@@ -476,13 +477,19 @@ const NeonDB = {
                 } else resolve();
             };
         });
+    },
+    async clearCacheByBookId(bookId) {
+        return this.deleteBookChapters(bookId);
     }
 };
 
 const app = {
     sents: [], currentIndex: -1, isPlaying: false,
-    audio: new Audio(), nextUrl: null,
-    yKey: "069b6659-984b-4c5f-880e-aaedcfd84102",
+    audio: new Audio(), 
+    audioCtx: null, nextStartTime: 0, currentBufferSource: null, audioBufferCache: {}, // Для бесшовного сшивания
+    reconnectTimer: null,
+    nextUrl: null, prevUrl: null, currentBookId: 'current',
+    chapterMarkers: [], isFetchingNext: false,
     library: [], voices: [], sites: [],
     settingsOpen: false, libOpen: false,
     currentBookMetadata: { title: '', cover: '' },
@@ -504,7 +511,6 @@ const app = {
         this.loadSitesData();
         this.loadLibraryData();
         
-        // ПРЕДОХРАНИТЕЛЬ ДЛЯ GOOGLE VOICES (Спасает от краша в АПК)
         const loadVoices = () => { 
             if (window.speechSynthesis) {
                 this.voices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('ru')); 
@@ -519,19 +525,28 @@ const app = {
             if(this.audio.src.includes('blob:')) URL.revokeObjectURL(this.audio.src);
             this.jump(1);
         };
-        
-        this.updateSiteTemplate();
-        this.checkModelStatus();
 
-        console.log("Шаг 3: Загрузка нейросети (transformers.js)...");
-        try {
-            const module = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0');
-            module.env.backends.onnx.wasm.numThreads = 1;
-            window.NeuralTTS = { pipeline: module.pipeline };
-            console.log("✅ Нейросеть успешно подгружена в ядро!");
-        } catch(e) {
-            console.error("❌ Сбой подгрузки нейросети: " + e.message);
-        }
+        // БЕСШУМНЫЙ АВТОПОВТОР ПРИ ПАДЕНИИ СЕТИ
+        this.audio.onerror = () => {
+            if (!this.isPlaying) return;
+            const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || {};
+            
+            if (conf.autoresume !== false) {
+                console.error("ОБРЫВ СЕТИ. ТИХИЙ АВТОПОВТОР ЧЕРЕЗ 3 СЕКУНДЫ...");
+                if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+                
+                this.reconnectTimer = setTimeout(() => {
+                    if (this.isPlaying) {
+                        this.play(this.currentIndex);
+                    }
+                }, 3000);
+            } else {
+                this.stop();
+                this.logToast("Ошибка сети. Плеер остановлен.", "error");
+            }
+        };
+
+        this.updateSiteTemplate();
 
         const savedSession = localStorage.getItem('neon_pro_save');
         if(savedSession) {
@@ -540,7 +555,7 @@ const app = {
                 if(data.url) {
                     document.getElementById('url-input').value = data.url;
                     console.log("Запуск сохраненной сессии...");
-                    this.processChapter().then(() => {
+                    this.processChapter(data.url, false).then(() => {
                         if(data.index !== undefined) setTimeout(() => this.play(data.index), 800);
                     });
                 }
@@ -593,15 +608,25 @@ const app = {
     },
 
     loadSettings() {
-        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', text: '#f1f5f9', glow: 1, speed: 1.0 };
-        document.getElementById('cfg-theme').value = conf.theme;
-        document.getElementById('cfg-bg').value = conf.bg;
-        document.getElementById('cfg-text').value = conf.text;
-        document.getElementById('cfg-glow').value = conf.glow;
+        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', text: '#f1f5f9', cached: '#10b981', glow: 1, speed: 1.0, autoresume: true, engine: 'quality' };
+        document.getElementById('cfg-theme').value = conf.theme || '#a855f7';
+        document.getElementById('cfg-bg').value = conf.bg || '#0a0a0f';
+        document.getElementById('cfg-text').value = conf.text || '#f1f5f9';
+        if(document.getElementById('cfg-cached')) document.getElementById('cfg-cached').value = conf.cached || '#10b981';
+        document.getElementById('cfg-glow').value = conf.glow || 1;
         
+        if(document.getElementById('cfg-font')) {
+            document.getElementById('cfg-font').value = conf.font || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+        }
         if(document.getElementById('voice-speed')) {
             document.getElementById('voice-speed').value = conf.speed || 1.0;
             document.getElementById('speed-val').innerText = parseFloat(conf.speed || 1.0).toFixed(1) + 'x';
+        }
+        if(document.getElementById('cfg-autoresume')) {
+            document.getElementById('cfg-autoresume').checked = conf.autoresume !== false;
+        }
+        if(document.getElementById('voice-engine-select')) {
+             document.getElementById('voice-engine-select').value = conf.engine || 'quality';
         }
         this.applySettingsUI(conf);
     },
@@ -611,12 +636,15 @@ const app = {
             theme: document.getElementById('cfg-theme').value,
             bg: document.getElementById('cfg-bg').value,
             text: document.getElementById('cfg-text').value,
+            font: document.getElementById('cfg-font') ? document.getElementById('cfg-font').value : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+            cached: document.getElementById('cfg-cached') ? document.getElementById('cfg-cached').value : '#10b981',
             glow: document.getElementById('cfg-glow').value,
-            speed: document.getElementById('voice-speed') ? document.getElementById('voice-speed').value : 1.0
+            speed: document.getElementById('voice-speed') ? document.getElementById('voice-speed').value : 1.0,
+            autoresume: document.getElementById('cfg-autoresume') ? document.getElementById('cfg-autoresume').checked : true,
+            engine: document.getElementById('voice-engine-select') ? document.getElementById('voice-engine-select').value : 'quality'
         };
         localStorage.setItem('neon_custom_ui', JSON.stringify(conf));
         this.applySettingsUI(conf);
-        if (this.audio) this.audio.playbackRate = parseFloat(conf.speed);
     },
 
     applySettingsUI(conf) {
@@ -625,6 +653,8 @@ const app = {
         root.style.setProperty('--theme-rgb', this.hexToRgb(conf.theme));
         root.style.setProperty('--bg-base', conf.bg);
         root.style.setProperty('--text-color', conf.text);
+        root.style.setProperty('--font', conf.font || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+        root.style.setProperty('--theme-cached-hex', conf.cached || '#10b981');
         root.style.setProperty('--glow-int', conf.glow);
     },
 
@@ -688,28 +718,56 @@ const app = {
         if (site) document.getElementById('url-input').value = site.tpl;
     },
 
-    loadLibraryData() { this.library = JSON.parse(localStorage.getItem('neon_books_db')) || []; },
-    saveLibraryData() { localStorage.setItem('neon_books_db', JSON.stringify(this.library)); this.renderLibraryGrid(); },
+    async loadLibraryData() {
+        return new Promise((resolve) => {
+            const req = NeonDB.db.transaction("books").objectStore("books").getAll();
+            req.onsuccess = () => { this.library = req.result || []; resolve(); };
+        });
+    },
 
-    addToLibraryCurrent() {
+    async saveLibraryData() {
+        const tx = NeonDB.db.transaction("books", "readwrite");
+        for (let book of this.library) {
+            tx.objectStore("books").put(book);
+        }
+    },
+
+    async addToLibraryCurrent() {
         const url = document.getElementById('url-input').value;
         if(!url || url.length < 15) return this.logToast('Введите ссылку!', 'error');
-        const domain = new URL(url).hostname.replace('www.', '').split('.')[0];
+        
         let title = this.currentBookMetadata.title || url.split('/').filter(Boolean).pop().replace(/-/g, ' ');
         title = title.charAt(0).toUpperCase() + title.slice(1);
-        const newBook = { id: Date.now().toString(), title: title, url: url, site: document.getElementById('site-select').value, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, isDownloaded: false };
+        
+        const bookId = 'book_' + Date.now().toString();
+        const newBook = { id: bookId, title: title, url: url, site: document.getElementById('site-select').value, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, cachedCount: 0 };
+        
+        this.currentBookId = bookId;
         this.library.push(newBook);
-        this.saveLibraryData();
+        await this.saveLibraryData();
         this.logToast("Сохранено в Библиотеку!", "ok");
     },
 
     async deleteEntireBook(id) {
-        if(!confirm("Удалить книгу и все скачанные главы навсегда?")) return;
+        if(!confirm("Удалить книгу полностью из библиотеки?")) return;
         await NeonDB.deleteBookChapters(id);
+        const tx = NeonDB.db.transaction("books", "readwrite");
+        tx.objectStore("books").delete(id);
         this.library = this.library.filter(b => b.id !== id);
-        this.saveLibraryData();
         this.renderLibraryGrid();
         this.logToast("Книга удалена", "ok");
+    },
+
+    async clearBookCache(id) {
+        if(!confirm("Очистить скачанные главы (кэш), но оставить книгу в библиотеке?")) return;
+        await NeonDB.clearCacheByBookId(id);
+        let book = this.library.find(b => b.id === id);
+        if(book) {
+            book.cachedCount = 0;
+            await this.saveLibraryData();
+        }
+        this.renderLibraryGrid();
+        this.logToast("Кэш очищен", "ok");
     },
 
     renderLibraryGrid() {
@@ -719,24 +777,27 @@ const app = {
 
         this.library.forEach(book => {
             const card = document.createElement('div');
-            card.className = `book-card ${book.isDownloading ? 'downloading' : (book.isDownloaded ? 'downloaded' : '')}`;
+            card.className = `book-card ${book.isDownloading ? 'downloading' : ''}`;
             
             const coverHtml = book.coverUrl ? `<img src="${book.coverUrl}" class="book-cover">` : `<div class="book-cover" style="display:flex; align-items:center; justify-content:center; background:#111; color:#222; font-weight:900;">NEON</div>`;
             
             let btnAction = book.isDownloading 
-                ? `<button class="action-btn book-btn" style="color:var(--danger);" onclick="app.stopDownload('${book.id}')">СТОП</button>`
-                : `<button class="action-btn book-btn" style="color:var(--theme-hex);" onclick="app.startDownload('${book.id}')">${book.isDownloaded ? 'ОБНОВИТЬ' : 'СКАЧАТЬ'}</button>`;
+                ? `<button class="action-btn book-btn" style="color:var(--danger); border-color:var(--danger);" onclick="app.stopBackgroundSync('${book.id}')">СТОП</button>`
+                : `<button class="action-btn book-btn" style="color:var(--theme-hex);" onclick="app.startBackgroundSync('${book.id}')">СКАЧАТЬ</button>`;
 
             card.innerHTML = `
-                <div class="download-badge" id="badge-${book.id}">0</div>
+                <div class="download-badge" id="badge-${book.id}" style="display:block;">${book.cachedCount || 0} глав</div>
                 <div class="book-content">
                     ${coverHtml}
                     <div class="book-info" style="padding:15px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
                         <div class="book-title" style="font-size:14px; font-weight:800; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${book.title}</div>
                         <div class="book-actions" style="display:flex; gap:8px; margin-top:10px;">
                             <button class="action-btn book-btn" style="flex:1; background:var(--theme-hex); color:#fff; border:none;" onclick="app.loadBookFromLib('${book.id}')">ЧИТАТЬ</button>
-                            <button class="action-btn book-btn" style="width:40px; color:var(--danger);" onclick="app.deleteEntireBook('${book.id}')">🗑️</button>
                             ${btnAction}
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                            <button class="action-btn" style="color:#f59e0b; border:none; padding:4px;" onclick="app.clearBookCache('${book.id}')">🧹 КЭШ</button>
+                            <button class="action-btn" style="color:var(--danger); border:none; padding:4px;" onclick="app.deleteEntireBook('${book.id}')">🗑️ КНИГУ</button>
                         </div>
                     </div>
                 </div>
@@ -748,10 +809,11 @@ const app = {
     loadBookFromLib(id) {
         const book = this.library.find(b => b.id === id);
         if(book) { 
+            this.currentBookId = book.id;
             document.getElementById('site-select').value = book.site || 'freeweb'; 
             document.getElementById('url-input').value = book.url; 
             this.toggleLibrary(); 
-            this.processChapter(); 
+            this.processChapter(book.url, false); 
         }
     },
 
@@ -780,8 +842,8 @@ const app = {
         this.logToast("Ожидание подтверждения...", "ok");
         if (this.captchaPendingUrl) {
             document.getElementById('url-input').value = this.captchaPendingUrl;
+            this.processChapter(this.captchaPendingUrl, false);
             this.captchaPendingUrl = null;
-            this.processChapter();
         }
     },
 
@@ -793,20 +855,18 @@ const app = {
         let html = "";
         let success = false;
         
-        // Собираем цепочку методов пробива сайта
         const endpoints = [];
         
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
             endpoints.push({ type: 'native', url: url });
         }
-        // Прокси идут следом как запасной план для АПК, и как основной для Веба
         endpoints.push({ type: 'proxy', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` });
         endpoints.push({ type: 'proxy', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` });
 
         for (let ep of endpoints) {
             try {
                 console.log(`Пробуем метод: [${ep.type}] -> ${ep.url.substring(0, 60)}...`);
-                t.querySelector('span').innerText = `Метод: ${ep.type.toUpperCase()}...`;
+                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Метод: ${ep.type.toUpperCase()}...`;
                 
                 let text = "";
                 let status = 0;
@@ -832,8 +892,6 @@ const app = {
                     text = await res.text();
                 }
 
-                console.log(`[${ep.type}] Ответ сервера. Статус: ${status}, Длина: ${text ? text.length : 0}`);
-
                 if (ep.type === 'proxy' && text.trim().startsWith('{') && text.includes('"contents"')) {
                     try { text = JSON.parse(text).contents; } catch(e){}
                 }
@@ -845,10 +903,9 @@ const app = {
                         this.openCaptchaModal(url);
                         throw new Error("BLOCK_CLOUDFLARE");
                     }
-                    continue; // Пробуем следующий эндпоинт
+                    continue; 
                 }
 
-                // Считаем успехом, если текста много и это не системная заглушка 301/403
                 if (text && text.length > 500 && !text.includes('301 Moved Permanently')) {
                     html = text;
                     success = true;
@@ -891,25 +948,30 @@ const app = {
             throw new Error("Текст не найден.");
         }
 
-        let nUrl = null;
+        let nUrl = null, pUrl = null;
         Array.from(doc.querySelectorAll('a')).forEach(a => {
             const linkText = a.innerText.toLowerCase();
+            const href = a.getAttribute('href');
+            if (!href || href === '#') return;
             if (linkText.includes('next') || linkText.includes('следующая') || linkText.includes('вперед')) {
-                const href = a.getAttribute('href');
-                if (href && href !== '#') nUrl = new URL(href, url).href;
+                nUrl = new URL(href, url).href;
+            }
+            if (linkText.includes('prev') || linkText.includes('предыдущая') || linkText.includes('назад')) {
+                pUrl = new URL(href, url).href;
             }
         });
         
-        console.log(`Следующая глава: ${nUrl || "Не найдена"}`);
+        console.log(`Следующая: ${nUrl || "Нет"} | Предыдущая: ${pUrl || "Нет"}`);
         return { 
             text: paras.join('\n\n'), 
             nextUrl: nUrl, 
+            prevUrl: pUrl,
             title: doc.querySelector('title')?.innerText || "", 
             cover: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || "" 
         };
     },
 
-    async startDownload(id) {
+    async startBackgroundSync(id) {
         let book = this.library.find(b => b.id === id);
         if (!book) return;
         
@@ -917,77 +979,95 @@ const app = {
         this.renderLibraryGrid(); 
         
         const badge = document.getElementById(`badge-${id}`);
-        let curUrl = book.url;
-        let count = 0;
+        let forwardUrl = book.url;
+        let backwardUrl = null;
+        let count = book.cachedCount || 0;
         const isTranslateMode = document.getElementById('mode-select').value === 'translate';
 
-        while(curUrl && this.activeDownloads[id]) {
-            let existing = await NeonDB.getChapter(curUrl);
-            if (existing) { 
-                curUrl = existing.nextUrl; 
-            } else {
-                try {
-                    let data = await this.networkFetchCore(curUrl, book.site || 'freeweb');
-                    
-                    let textToSave = data.text;
-                    if(isTranslateMode) {
-                        textToSave = await this.translate(data.text);
-                    }
-                    
-                    await NeonDB.saveChapter(curUrl, id, textToSave, data.nextUrl);
-                    curUrl = data.nextUrl;
-                    count++;
-                    if(badge) { badge.style.display = 'block'; badge.innerText = count; }
-                    
-                    await new Promise(r => setTimeout(r, 350)); 
-                } catch(e) {
-                    this.logToast(`Сбой на главе ${count + 1}`, "error");
-                    break;
+        try {
+            let data = await this.networkFetchCore(forwardUrl, book.site || 'freeweb');
+            backwardUrl = data.prevUrl;
+            forwardUrl = data.nextUrl;
+            let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
+            await NeonDB.saveChapter(book.url, id, textToSave, data.nextUrl, data.prevUrl);
+            count++;
+            if(badge) badge.innerText = `${count} глав`;
+        } catch(e) {}
+
+        while(this.activeDownloads[id] && (forwardUrl || backwardUrl)) {
+            if (forwardUrl) {
+                let existing = await NeonDB.getChapter(forwardUrl);
+                if (existing) { 
+                    forwardUrl = existing.nextUrl; 
+                } else {
+                    try {
+                        let data = await this.networkFetchCore(forwardUrl, book.site || 'freeweb');
+                        let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
+                        await NeonDB.saveChapter(forwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
+                        forwardUrl = data.nextUrl;
+                        count++;
+                        if(badge) badge.innerText = `${count} глав`;
+                        await new Promise(r => setTimeout(r, 1500)); 
+                    } catch(e) { forwardUrl = null; }
+                }
+            }
+            if (backwardUrl && this.activeDownloads[id]) {
+                let existing = await NeonDB.getChapter(backwardUrl);
+                if (existing) { 
+                    backwardUrl = existing.prevUrl; 
+                } else {
+                    try {
+                        let data = await this.networkFetchCore(backwardUrl, book.site || 'freeweb');
+                        let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
+                        await NeonDB.saveChapter(backwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
+                        backwardUrl = data.prevUrl;
+                        count++;
+                        if(badge) badge.innerText = `${count} глав`;
+                        await new Promise(r => setTimeout(r, 1500)); 
+                    } catch(e) { backwardUrl = null; }
                 }
             }
         }
         
+        book.cachedCount = count;
         book.isDownloading = false; 
-        book.isDownloaded = true; 
         this.activeDownloads[id] = false;
-        this.saveLibraryData();
+        await this.saveLibraryData();
         this.renderLibraryGrid();
-        this.logToast(`Загрузка завершена!`, "ok");
+        this.logToast(`Кэширование завершено!`, "ok");
     },
 
-    stopDownload(id) {
+    stopBackgroundSync(id) {
         this.activeDownloads[id] = false;
         let book = this.library.find(b => b.id === id);
-        if(book) { book.isDownloading = false; this.saveLibraryData(); this.clearToasts(); this.logToast("Загрузка прервана.", "ok"); }
+        if(book) { book.isDownloading = false; this.saveLibraryData(); this.clearToasts(); this.logToast("Загрузка прервана.", "ok"); this.renderLibraryGrid(); }
     },
 
-    async processChapter() {
-        console.log("=== ЧТЕНИЕ ГЛАВЫ ===");
-        this.stop();
-        this.audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-        this.audio.play().catch(()=>{});
-
-        this.clearToasts();
-        const url = document.getElementById('url-input').value;
+    async processChapter(overrideUrl = null, isAppend = false) {
+        const url = overrideUrl || document.getElementById('url-input').value;
         const mode = document.getElementById('mode-select').value; 
         const site = document.getElementById('site-select').value;
 
         if(!url) return console.warn("Ссылка пустая!");
 
+        if(!isAppend) {
+            this.stop();
+            this.clearToasts();
+        }
+
         let rawText = "";
         let isAlreadyTranslated = false;
         this.currentBookMetadata = { title: '', cover: '' };
             
-        let tDb = this.logToast("Проверка кэша...", "ok", 0);
-        console.log("Ищем главу в IndexedDB...");
+        let tDb = this.logToast(isAppend ? "Подгрузка продолжения..." : "Проверка кэша...", "ok", 0);
         const dbData = await NeonDB.getChapter(url);
         
         if (dbData) {
             tDb.remove();
             this.logToast("Извлечено из памяти", "ok");
-            console.log("Найдено в кэше!");
             rawText = dbData.text;
             this.nextUrl = dbData.nextUrl;
+            this.prevUrl = dbData.prevUrl;
             
             const ruChars = rawText.match(/[а-яА-ЯёЁ]/g);
             if (ruChars && ruChars.length > rawText.length * 0.1) {
@@ -996,12 +1076,13 @@ const app = {
         } else {
             tDb.remove();
             try {
-                console.log("В кэше нет. Качаем из сети...");
                 const data = await this.networkFetchCore(url, site);
                 rawText = data.text;
                 this.nextUrl = data.nextUrl;
+                this.prevUrl = data.prevUrl;
                 this.currentBookMetadata.title = data.title;
                 this.currentBookMetadata.cover = data.cover;
+                await NeonDB.saveChapter(url, this.currentBookId, rawText, data.nextUrl, data.prevUrl);
             } catch (e) { 
                 if (e.message.includes("Требуется обход защиты")) return;
                 this.clearToasts();
@@ -1009,27 +1090,31 @@ const app = {
             }
         }
 
+        document.getElementById('url-input').value = url;
+        let chapterLabel = url.split('/').filter(Boolean).pop().replace(/-/g, ' ');
+
+        let finalText = rawText;
         if (mode === "translate" && !isAlreadyTranslated) {
             this.clearToasts();
             let tTr = this.logToast("Нейроперевод...", "ok", 0);
-            console.log("Начинаем перевод текста...");
             try {
-                const translatedText = await this.translate(rawText);
-                this.render(translatedText);
+                finalText = await this.translate(rawText);
+                await NeonDB.saveChapter(url, this.currentBookId, finalText, this.nextUrl, this.prevUrl);
+                this.render(finalText, isAppend, chapterLabel);
                 tTr.remove();
-                this.logToast("Готово. Плеер ожидает.", "ok");
+                this.logToast("Готово.", "ok");
             } catch (e) { 
-                console.error("Ошибка перевода:", e);
                 tTr.remove();
                 this.logToast("Сбой перевода.", "error"); 
+                return;
             }
         } else {
             this.clearToasts();
-            let msg = isAlreadyTranslated ? "Открыт русский текст..." : "Очистка оригинала...";
+            let msg = isAlreadyTranslated ? "Открыт кэш..." : "Очистка оригинала...";
             let tOr = this.logToast(msg, "ok", 0);
-            this.render(rawText);
+            this.render(rawText, isAppend, chapterLabel);
             tOr.remove();
-            this.logToast("Готово. Плеер ожидает.", "ok");
+            if (!isAppend) this.logToast("Готово. Плеер ожидает.", "ok");
         }
     },
 
@@ -1046,190 +1131,227 @@ const app = {
         return result;
     },
 
-    render(text) {
-        console.log("Рендер текста...");
+    render(text, isAppend = false, chapterTitle = '') {
+        console.log("Рендер текста (режим жестких чанков < 200)...");
         const container = document.getElementById('reader-container');
-        container.innerHTML = '';
-        this.sents = [];
-        text.split('\n\n').forEach((p, pIdx) => {
+        
+        if (!isAppend) {
+            container.innerHTML = '';
+            this.sents = [];
+            this.chapterMarkers = [];
+            this.currentIndex = -1;
+            container.scrollTop = 0;
+            this.audioBufferCache = {}; // Очистка кэша аудио при новой главе
+        }
+
+        if(!this.chapterMarkers) this.chapterMarkers = [];
+        this.chapterMarkers.push({ index: this.sents.length, title: chapterTitle });
+
+        // Жесткий лимит для Google Premium, чтобы не ловить DOMException
+        const chunkSize = 200; 
+        
+        let cleanedText = text.replace(/\n\s*\n/g, '\n');
+        const paragraphs = cleanedText.split('\n');
+
+        let currentDiv = document.createElement('div');
+        currentDiv.className = 'paragraph';
+        currentDiv.style.marginBottom = '10px';
+        
+        let currentChunkText = "";
+        
+        paragraphs.forEach((p) => {
             if (!p.trim()) return;
-            const pDiv = document.createElement('div');
-            pDiv.className = 'paragraph'; pDiv.style.animationDelay = `${pIdx * 0.05}s`;
             const parts = p.match(/[^.!?]+[.!?]+/g) || [p];
+            
             parts.forEach(s => {
-                const gIdx = this.sents.length;
-                const span = document.createElement('span'); span.className = 'sentence'; span.id = 's-' + gIdx;
-                span.innerText = s + " "; span.onclick = () => this.play(gIdx);
-                this.sents.push(s.trim()); pDiv.appendChild(span);
-            });
-            container.appendChild(pDiv);
-        });
-        this.currentIndex = -1; this.updateUI();
-        console.log(`Рендер завершен. Всего предложений: ${this.sents.length}`);
-    },
-
-    async checkModelStatus() {
-        const engine = document.getElementById('voice-engine-select').value;
-        const btn = document.getElementById('dl-model-btn');
-        const label = document.getElementById('model-ok-label');
-        
-        if (engine === 'vits') {
-            const isInstalled = localStorage.getItem('vits_installed') === 'true';
-            btn.style.display = isInstalled ? 'none' : 'flex';
-            label.style.display = isInstalled ? 'block' : 'none';
-        } else {
-            btn.style.display = 'none'; label.style.display = 'none';
-        }
-    },
-
-    async downloadLocalModel() {
-        console.log("Запрошена загрузка VITS...");
-        if (!window.NeuralTTS) return this.logToast("Ядро загружается, подожди секунду...", "error");
-        
-        let t = this.logToast(`Качаем VITS (35 МБ)... Экран не гасить!`, "ok", 0);
-
-        try {
-            console.log("Старт pipeline HF...");
-            window.appSynthesizer = await window.NeuralTTS.pipeline('text-to-speech', 'Xenova/mms-tts-rus', {
-                quantized: true,
-                progress_callback: (x) => {
-                    if (x.status === 'progress' && x.name.includes('onnx')) {
-                        let pct = Math.round((x.loaded / x.total) * 100);
-                        console.log(`Загрузка VITS: ${pct}%`);
-                        t.querySelector('span').innerText = `Загрузка: ${pct}%`;
-                    }
+                s = s.trim();
+                if (!s) return;
+                
+                if (currentChunkText.length + s.length > chunkSize && currentChunkText.length > 0) {
+                    const gIdx = this.sents.length;
+                    const span = document.createElement('span');
+                    span.className = 'sentence'; span.id = 's-' + gIdx;
+                    span.innerHTML = currentChunkText + " ";
+                    span.onclick = () => { this.preloadedIndex = -1; this.play(gIdx); };
+                    
+                    this.sents.push(currentChunkText.replace(/<br>/g, ' ').trim());
+                    currentDiv.appendChild(span);
+                    currentChunkText = ""; 
                 }
+                currentChunkText += s + " ";
             });
+            currentChunkText += "<br><br>";
+        });
+        
+        if (currentChunkText.replace(/<br>/g, '').trim().length > 0) {
+            const gIdx = this.sents.length;
+            const span = document.createElement('span');
+            span.className = 'sentence'; span.id = 's-' + gIdx;
+            span.innerHTML = currentChunkText;
+            span.onclick = () => { this.preloadedIndex = -1; this.play(gIdx); };
             
-            t.remove();
-            console.log("VITS успешно закэширован.");
-            this.logToast("VITS УСТАНОВЛЕН И ЗАКЭШИРОВАН", "ok");
-            localStorage.setItem('vits_installed', 'true');
-            this.checkModelStatus();
-        } catch(e) {
-            console.error("ОШИБКА СКАЧИВАНИЯ VITS:", e);
-            t.remove();
-            this.logToast("Сбой загрузки: " + e.message, "error");
+            this.sents.push(currentChunkText.replace(/<br>/g, ' ').trim());
+            currentDiv.appendChild(span);
         }
+
+        container.appendChild(currentDiv);
+        this.updateUI();
+        this.updateVisualizers();
     },
 
-    async playVITSModel(text) {
-        console.log("Генерация VITS началась...");
-        if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        this.clearToasts();
-        
-        let t = this.logToast(`VITS синтезирует...`, "ok", 0);
-        
+    getGoogleTTSUrl(text) {
+        // Убираем скорость из URL, так как скорость теперь задается напрямую в AudioContext.playbackRate
+        return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ru&client=tw-ob`;
+    },
+
+    // Функция скачивания и конвертации в AudioBuffer для бесшовности
+    async getAudioBuffer(text) {
+        const ttsUrl = this.getGoogleTTSUrl(text);
+        let arrayBuffer;
+
         try {
-            if (!window.appSynthesizer) {
-                console.log("Поднимаем VITS из кэша...");
-                window.appSynthesizer = await window.NeuralTTS.pipeline('text-to-speech', 'Xenova/mms-tts-rus', { quantized: true });
+            // Если мы в APK, используем нативный HTTP чтобы обойти CORS
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
+                const res = await window.Capacitor.Plugins.CapacitorHttp.get({
+                    url: ttsUrl,
+                    responseType: 'arraybuffer'
+                });
+                const binaryString = window.atob(res.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                arrayBuffer = bytes.buffer;
+            } else {
+                throw new Error("Not in APK");
             }
-
-            console.log("Отдаем текст нейросети...");
-            const out = await window.appSynthesizer(text);
-            console.log("Звук сгенерирован!");
-            
-            const audioData = out.audio; 
-            const sampleRate = out.sampling_rate;
-            
-            const audioBuffer = this.audioCtx.createBuffer(1, audioData.length, sampleRate);
-            audioBuffer.getChannelData(0).set(audioData);
-            
-            if (this.audioSource) { try { this.audioSource.stop(); } catch(e){} }
-            this.audioSource = this.audioCtx.createBufferSource();
-            this.audioSource.buffer = audioBuffer;
-            
-            const currentSpeed = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
-            this.audioSource.playbackRate.value = currentSpeed;
-
-            this.audioSource.connect(this.audioCtx.destination);
-            this.audioSource.onended = () => { console.log("Предложение прочитано."); if(this.isPlaying) this.jump(1); };
-            
-            t.remove();
-            this.audioSource.start();
-            this.isPlaying = true; this.updateUI();
-        } catch(e) {
-            console.error("КРАШ VITS:", e);
-            t.remove();
-            this.logToast("Ошибка VITS: " + e.message, "error");
-            this.stop();
+        } catch (e) {
+            // Если в обычном браузере — используем надежный прокси для бинарников
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`;
+            const res = await fetch(proxyUrl);
+            if (!res.ok) throw new Error("CORS Proxy Failed");
+            arrayBuffer = await res.arrayBuffer();
         }
+
+        if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return await this.audioCtx.decodeAudioData(arrayBuffer);
+    },
+
+    // Предзагрузка, чтобы избежать пауз при скачивании
+    preloadAudio(text) {
+        if (!this.audioBufferCache[text]) {
+            this.audioBufferCache[text] = this.getAudioBuffer(text);
+        }
+        return this.audioBufferCache[text];
     },
 
     async play(index) {
         console.log(`Играем индекс: ${index}`);
-        if (index < 0 || index >= this.sents.length) return this.stop();
-        this.currentIndex = index; this.updateUI();
+        
+        if (index >= this.sents.length) {
+            if (this.nextUrl && !this.isFetchingNext) {
+                console.log("Достигнут конец. Автоподгрузка следующей главы...");
+                this.isFetchingNext = true;
+                await this.processChapter(this.nextUrl, true);
+                this.isFetchingNext = false;
+                if (index < this.sents.length) this.play(index);
+                else this.stop();
+            } else { this.stop(); }
+            return;
+        }
+
+        if (index < 0) return this.stop();
+        
+        // Сброс очереди при ручном переходе (ты кликнул в текст или нажал кнопку)
+        if (this.currentIndex !== index - 1) {
+            this.nextStartTime = 0;
+            if (this.currentBufferSource) {
+                this.currentBufferSource.onended = null;
+                try { this.currentBufferSource.stop(); } catch(e){}
+            }
+        }
+
+        this.currentIndex = index; 
+        this.updateUI();
+        
         const voice = document.getElementById('voice-engine-select').value;
         const text = this.sents[index];
+        const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
         
-        console.log(`Движок: ${voice}. Текст: ${text.substring(0, 30)}...`);
+        if (voice === 'quality') { // Бесшовный сшиватель
+            try {
+                // Ждем буфер (если предзагружен - вернется мгновенно)
+                const buffer = await this.preloadAudio(text);
+                
+                if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                const source = this.audioCtx.createBufferSource();
+                source.buffer = buffer;
+                source.playbackRate.value = speed; // Задаем скорость сшивания
+                source.connect(this.audioCtx.destination);
+                
+                // Вычисляем время старта
+                const currentTime = this.audioCtx.currentTime;
+                if (this.nextStartTime < currentTime) {
+                    this.nextStartTime = currentTime + 0.05; // 50 миллисекунд задел
+                }
+                
+                // Запускаем точно по таймеру
+                source.start(this.nextStartTime);
+                this.currentBufferSource = source;
+                
+                // Время следующего старта (зависит от скорости воспроизведения)
+                const duration = buffer.duration / speed;
+                this.nextStartTime += duration;
+                
+                this.isPlaying = true;
+                
+                source.onended = () => {
+                    // Переход к следующему чанку, если плеер не остановлен
+                    if (this.isPlaying && this.currentIndex === index) {
+                        this.jump(1);
+                    }
+                };
 
-        if (voice === 'google') {
-            this.playGoogle(text);
-        } else if (voice === 'alisa') {
-            await this.playAlisa(text);
-        } else if (voice === 'vits') {
-            await this.playVITSModel(text);
-        } else {
-            this.clearToasts();
-            this.logToast(`Модуль не поддерживается!`, "error");
-            this.stop();
-        }
-    },
+                // Закидываем в память следующие куски
+                if (index + 1 < this.sents.length) this.preloadAudio(this.sents[index + 1]).catch(()=>{});
+                if (index + 2 < this.sents.length) this.preloadAudio(this.sents[index + 2]).catch(()=>{});
 
-    playGoogle(text) {
-        console.log("Google TTS старт.");
-        // ПРЕДОХРАНИТЕЛЬ ДЛЯ GOOGLE
-        if(window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-            const utt = new SpeechSynthesisUtterance(text); utt.lang = 'ru-RU';
-            utt.rate = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
-            if (this.voices.length > 0) utt.voice = this.voices.find(v => v.name.includes('Google') || v.name.includes('ru-RU')) || this.voices[0];
-            utt.onend = () => { if (this.isPlaying) this.jump(1); };
-            window.speechSynthesis.speak(utt);
-            this.isPlaying = true; this.updateUI();
-        } else {
-            console.error("SpeechSynthesis недоступен в этой среде.");
-            this.logToast("Google TTS отключен в системе", "error");
-            this.stop();
-        }
-    },
-
-    async playAlisa(text) {
-        console.log("Запрос Алисы (Яндекс)...");
-        const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0).toFixed(1);
-        const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=${speed}`;
-        
-        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
-
-        try { 
-            if (isAPK) {
-                console.log("АПК: Прямая ссылка");
-                this.audio.src = ttsUrl; 
-                this.audio.playbackRate = parseFloat(speed);
-                await this.audio.play(); 
-            } else {
-                console.log("ВЕБ: Прокси-запрос Алисы");
-                const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`;
-                const res = await fetch(proxyUrl); 
-                if (!res.ok) throw new Error();
-                const blob = await res.blob(); 
-                if (blob.size > 1000) { 
-                    this.audio.src = URL.createObjectURL(blob); 
-                    this.audio.playbackRate = parseFloat(speed);
-                    await this.audio.play(); 
-                } else throw new Error();
+            } catch (e) {
+                console.error("Ошибка аудио сшивания:", e);
+                // Тихий автореконнект
+                if (!this.isPlaying) return;
+                const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || {};
+                if (conf.autoresume !== false) {
+                    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+                    this.reconnectTimer = setTimeout(() => {
+                        if (this.isPlaying) this.play(this.currentIndex);
+                    }, 3000);
+                } else {
+                    this.stop();
+                }
             }
-            this.isPlaying = true; 
-            this.updateUI(); 
-        } catch (err) {
-            console.error("ОШИБКА АЛИСЫ:", err);
-            this.clearToasts();
-            this.logToast("Яндекс отказ. Включен Google TTS.", "error");
-            document.getElementById('voice-engine-select').value = 'google';
-            this.playGoogle(text);
+        } else { // Системный Оффлайн
+            if (this.currentBufferSource) {
+                this.currentBufferSource.onended = null;
+                try { this.currentBufferSource.stop(); } catch(e){}
+            }
+            if(window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+                const utt = new SpeechSynthesisUtterance(text); 
+                utt.lang = 'ru-RU';
+                utt.rate = speed;
+                if (this.voices.length > 0) {
+                    utt.voice = this.voices.find(v => v.name.includes('Google') || v.lang.includes('ru')) || this.voices[0];
+                }
+                utt.onend = () => { if (this.isPlaying) this.jump(1); };
+                window.speechSynthesis.speak(utt);
+                this.isPlaying = true;
+            } else {
+                console.error("SpeechSynthesis недоступен.");
+                this.logToast("Оффлайн TTS отключен в системе", "error");
+                this.stop();
+            }
         }
     },
 
@@ -1240,13 +1362,19 @@ const app = {
         }
         if (this.isPlaying) { 
             console.log("Кнопка: Пауза");
-            if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
-            this.audio.pause(); 
+            if(this.reconnectTimer) clearTimeout(this.reconnectTimer);
+            if(this.currentBufferSource) {
+                this.currentBufferSource.onended = null;
+                try { this.currentBufferSource.stop(); } catch(e){}
+            }
+            this.nextStartTime = 0;
             if(window.speechSynthesis) window.speechSynthesis.cancel(); 
             this.isPlaying = false; 
         } 
         else { 
             console.log("Кнопка: Плей");
+            this.preloadedIndex = -1;
+            this.nextStartTime = 0; 
             this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); 
         }
         this.updateUI();
@@ -1254,40 +1382,73 @@ const app = {
 
     stop() { 
         console.log("Полная остановка.");
-        if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
-        this.audio.pause(); 
+        if(this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        if(this.currentBufferSource) {
+            this.currentBufferSource.onended = null;
+            try { this.currentBufferSource.stop(); } catch(e){}
+        }
+        this.nextStartTime = 0;
         if(window.speechSynthesis) window.speechSynthesis.cancel(); 
         this.isPlaying = false; 
         this.updateUI(); 
     },
-    jump(delta) { this.play(this.currentIndex + delta); },
-    seekProgress(e) { if(!this.sents.length) return; const rect = e.currentTarget.getBoundingClientRect(); this.play(Math.floor(this.sents.length * ((e.clientX - rect.left) / rect.width))); },
+
+    jump(delta) { 
+        this.preloadedIndex = -1; 
+        this.nextStartTime = 0;
+        if (this.currentBufferSource) {
+            this.currentBufferSource.onended = null;
+            try { this.currentBufferSource.stop(); } catch(e){}
+        }
+        this.play(this.currentIndex + delta); 
+    },
+
+    seekProgress(e) { 
+        if(!this.sents.length) return; 
+        const rect = e.currentTarget.getBoundingClientRect(); 
+        this.preloadedIndex = -1;
+        this.nextStartTime = 0;
+        if (this.currentBufferSource) {
+            this.currentBufferSource.onended = null;
+            try { this.currentBufferSource.stop(); } catch(e){}
+        }
+        this.play(Math.floor(this.sents.length * ((e.clientX - rect.left) / rect.width))); 
+    },
 
     saveBookmark() {
         if (this.currentIndex === -1) {
             this.clearToasts();
             return this.logToast("Нечего сохранять!", "error");
         }
-        const data = { url: document.getElementById('url-input').value, index: this.currentIndex };
+        let cUrl = document.getElementById('url-input').value;
+        for (let i = this.chapterMarkers.length - 1; i >= 0; i--) {
+            if (this.currentIndex >= this.chapterMarkers[i].index) break;
+        }
+        const data = { url: cUrl, index: this.currentIndex };
         localStorage.setItem('neon_pro_save', JSON.stringify(data));
         this.clearToasts();
         this.logToast("Закладка сохранена!", "ok");
     },
     
     downloadMp3() { 
-        if (this.currentIndex !== -1 && this.audio.src && !this.audio.src.includes('data:audio')) {
-            window.open(this.audio.src); 
+        if (this.currentIndex !== -1 && this.sents.length > 0) {
+            const engine = document.getElementById('voice-engine-select').value;
+            if(engine === 'quality') {
+                window.open(this.getGoogleTTSUrl(this.sents[this.currentIndex]));
+            } else {
+                 this.logToast("MP3 доступен только для Онлайн режима.", "error");
+            }
         } else {
             this.clearToasts();
-            this.logToast("MP3 недоступен в оффлайн-режиме.", "error");
+            this.logToast("Нет данных для скачивания.", "error");
         }
     },
     
-    nextChapter() { 
+    nextChapter(forceAppend = false) { 
         console.log("Переход на следующую главу.");
-        if (this.nextUrl) { 
-            document.getElementById('url-input').value = this.nextUrl; 
-            this.processChapter(); 
+        if (this.nextUrl && !this.isFetchingNext) { 
+            this.isFetchingNext = true;
+            this.processChapter(this.nextUrl, forceAppend).then(() => this.isFetchingNext = false);
         } else {
             this.clearToasts();
             this.logToast("Ссылка не найдена.", "error");
@@ -1307,9 +1468,40 @@ const app = {
             document.getElementById('progress-fill').style.width = (((this.currentIndex + 1) / this.sents.length) * 100) + "%";
             document.getElementById('counter').innerText = `${this.currentIndex + 1}/${this.sents.length}`;
             
-            const data = { url: document.getElementById('url-input').value, index: this.currentIndex };
-            localStorage.setItem('neon_pro_save', JSON.stringify(data));
+            let cUrl = document.getElementById('url-input').value;
+            for (let i = this.chapterMarkers.length - 1; i >= 0; i--) {
+                if (this.currentIndex >= this.chapterMarkers[i].index) break;
+            }
+            localStorage.setItem('neon_pro_save', JSON.stringify({ url: cUrl, index: this.currentIndex }));
         }
+    },
+
+    updateVisualizers() {
+        const container = document.querySelector('.progress-container');
+        if (!container) return;
+        
+        const cachedBar = document.getElementById('progress-cached');
+        if(cachedBar) cachedBar.style.width = "100%"; 
+        
+        container.querySelectorAll('.chapter-marker').forEach(m => m.remove());
+        if (!this.chapterMarkers || this.sents.length === 0) return;
+        
+        this.chapterMarkers.forEach(marker => {
+            if (marker.index === 0) return; 
+            const pct = (marker.index / this.sents.length) * 100;
+            const mDiv = document.createElement('div');
+            mDiv.className = 'chapter-marker';
+            mDiv.style.position = 'absolute';
+            mDiv.style.left = pct + '%';
+            mDiv.style.top = '0';
+            mDiv.style.width = '2px';
+            mDiv.style.height = '100%';
+            mDiv.style.backgroundColor = '#fff';
+            mDiv.style.opacity = '0.8';
+            mDiv.style.zIndex = '5';
+            mDiv.title = marker.title;
+            container.appendChild(mDiv);
+        });
     }
 };
 
