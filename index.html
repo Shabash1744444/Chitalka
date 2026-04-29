@@ -346,8 +346,18 @@
 </footer>
 
 <script>
+// УБИВАЕМ ЗАСТРЯВШИЙ СЕРВИС-ВОРКЕР
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+            registration.unregister();
+        }
+    });
+}
+
 // Защита от фатального краша интерфейса
 if (typeof ort !== 'undefined') {
+
     ort.env.logLevel = 'error';
     ort.env.wasm.numThreads = 1; 
     ort.env.wasm.wasmPaths = './'; 
@@ -995,10 +1005,11 @@ const app = {
             t.remove();
             this.logToast("ГОЛОС УСТАНОВЛЕН", "ok");
             this.checkModelStatus();
-        } catch(e) {
+               } catch(e) {
             t.remove();
-            this.logToast("Сбой загрузки файла.", "error");
+            this.logToast("Сбой: " + e.message, "error");
         }
+
     },
 
 
