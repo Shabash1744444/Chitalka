@@ -74,7 +74,8 @@ jobs:
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' $MANIFEST
-          sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:hardwareAccelerated="true"/' $MANIFEST
+          # ВАЖНО: Добавил usesCleartextTraffic (для загрузки с любых сайтов) и largeHeap (чтобы нейронка не крашила память)
+          sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:usesCleartextTraffic="true" android:largeHeap="true" android:hardwareAccelerated="true"/' $MANIFEST
 
       - name: Create Release Key
         run: |
@@ -82,7 +83,8 @@ jobs:
 
       - name: Build & Sign APK
         run: |
-          npx cap copy android
+          # ИСПОЛЬЗУЕМ SYNC ВМЕСТО COPY, ЧТОБЫ ПЛАГИНЫ ТОЧНО ВШИЛИСЬ
+          npx cap sync android
           cd android && chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
           SIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -r | head -n 1)
