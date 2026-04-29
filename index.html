@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-
-<script src="coi-serviceworker.js"></script>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -709,7 +706,7 @@ const app = {
         }
     },
 
-    // Прямой парсер для сборки CapacitorHttp
+    // ГИБРИДНЫЙ ПАРСЕР (АПК + ВЕБ)
     async networkFetchCore(url, site) {
         this.clearToasts(); 
         let t = this.logToast(`Загрузка главы...`, 'ok', 0);
@@ -717,39 +714,55 @@ const app = {
         let html = "";
         let success = false;
         
-        const endpoints = [
-            url, 
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-        ];
+        // Проверяем, запущены ли мы внутри APK (Capacitor)
+        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
 
-        for (let ep of endpoints) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
-                
-                const res = await fetch(ep, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                
-                let text = await res.text();
-                    
-                if (text.trim().startsWith('{') && text.includes('"contents"')) {
-                    try { text = JSON.parse(text).contents; } catch(e){}
-                }
+        try {
+            if (isAPK) {
+                // Прямой вызов через нативный плагин АПК (обходит все CORS на уровне системы)
+                const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url: url });
+                html = res.data;
+                if (html && html.length > 500) success = true;
+            } else {
+                // Если мы на GitHub Pages (Веб), пускаем через прокси
+                const endpoints = [
+                    url, 
+                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+                ];
 
-                if (text.includes('<title>Just a moment...</title>') || text.includes('id="challenge-running"')) {
-                    t.remove();
-                    this.openCaptchaModal(url);
-                    throw new Error("BLOCK_CLOUDFLARE");
-                }
+                for (let ep of endpoints) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 8000);
+                        
+                        const res = await fetch(ep, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        
+                        let text = await res.text();
+                            
+                        if (text.trim().startsWith('{') && text.includes('"contents"')) {
+                            try { text = JSON.parse(text).contents; } catch(e){}
+                        }
 
-                if (res.ok && text.length > 500) {
-                    html = text;
-                    success = true;
-                    break;
+                        if (text.includes('<title>Just a moment...</title>') || text.includes('id="challenge-running"')) {
+                            t.remove();
+                            this.openCaptchaModal(url);
+                            throw new Error("BLOCK_CLOUDFLARE");
+                        }
+
+                        if (res.ok && text.length > 500) {
+                            html = text;
+                            success = true;
+                            break;
+                        }
+                    } catch(e) {
+                        if (e.message === "BLOCK_CLOUDFLARE") throw e;
+                    }
                 }
-            } catch(e) {
-                if (e.message === "BLOCK_CLOUDFLARE") throw e;
             }
+        } catch (e) {
+            if (e.message === "BLOCK_CLOUDFLARE") throw e;
         }
 
         t.remove();
@@ -945,17 +958,22 @@ const app = {
         }
     },
 
+    // ГИБРИДНАЯ ЗАГРУЗКА ГОЛОСА (АПК + ВЕБ)
     async downloadLocalModel() {
         const engine = document.getElementById('voice-engine-select').value;
-        const url = MODEL_LINKS[engine];
+        let url = MODEL_LINKS[engine];
         if(!url) return this.logToast("Движок не поддерживается", "error");
         
         this.clearToasts();
         let t = this.logToast(`Качаем голос [${engine}]...`, "ok", 0);
 
+        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
+
         try {
-            // Прямой fetch через CapacitorHttp
-            const res = await fetch(url);
+            // В АПК пускаем напрямую (плагин сам обойдет CORS), в Вебе - через прокси
+            let fetchUrl = isAPK ? url : ("https://corsproxy.io/?" + encodeURIComponent(url));
+            
+            const res = await fetch(fetchUrl);
             if (!res.ok) throw new Error("Сервер недоступен");
             
             const reader = res.body.getReader();
@@ -1058,43 +1076,37 @@ const app = {
         this.isPlaying = true; this.updateUI();
     },
 
+    // ГИБРИДНЫЙ ВЫЗОВ ЯНДЕКСА (АПК + ВЕБ)
     async playAlisa(text) {
         const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0).toFixed(1);
         const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=${speed}`;
+        
+        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
+
         try { 
-            this.audio.src = ttsUrl; 
-            this.audio.playbackRate = parseFloat(speed);
-            await this.audio.play(); 
+            if (isAPK) {
+                this.audio.src = ttsUrl; 
+                this.audio.playbackRate = parseFloat(speed);
+                await this.audio.play(); 
+            } else {
+                // Для веба используем прокси для аудио файла
+                const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`;
+                const res = await fetch(proxyUrl); 
+                if (!res.ok) throw new Error();
+                const blob = await res.blob(); 
+                if (blob.size > 1000) { 
+                    this.audio.src = URL.createObjectURL(blob); 
+                    this.audio.playbackRate = parseFloat(speed);
+                    await this.audio.play(); 
+                } else throw new Error();
+            }
             this.isPlaying = true; 
             this.updateUI(); 
-        } 
-        catch (e) {
-            try {
-                const proxies = [`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`];
-                let success = false;
-                for (let p of proxies) {
-                    try { 
-                        const res = await fetch(p); 
-                        if (res.ok) { 
-                            const blob = await res.blob(); 
-                            if (blob.size > 1000) { 
-                                this.audio.src = URL.createObjectURL(blob); 
-                                this.audio.playbackRate = parseFloat(speed);
-                                await this.audio.play(); 
-                                success = true; 
-                                break; 
-                            } 
-                        } 
-                    } catch (err) {}
-                }
-                if (!success) throw new Error();
-                this.isPlaying = true; this.updateUI();
-            } catch (err) {
-                this.clearToasts();
-                this.logToast("Яндекс отказ. Включен Google TTS.", "error");
-                document.getElementById('voice-engine-select').value = 'google';
-                this.playGoogle(text);
-            }
+        } catch (err) {
+            this.clearToasts();
+            this.logToast("Яндекс отказ. Включен Google TTS.", "error");
+            document.getElementById('voice-engine-select').value = 'google';
+            this.playGoogle(text);
         }
     },
 
