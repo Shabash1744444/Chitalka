@@ -959,27 +959,28 @@ const app = {
     },
 
     // ГИБРИДНАЯ ЗАГРУЗКА ГОЛОСА (АПК + ВЕБ)
-    async downloadLocalModel() {
+        async downloadLocalModel() {
         const engine = document.getElementById('voice-engine-select').value;
-        let url = MODEL_LINKS[engine];
+        
+        // Зеркало на HuggingFace без лимитов и CORS
+        let url = engine === 'silero' 
+            ? "https://huggingface.co/simrat39/silero-tts-onnx-ru/resolve/main/v4_ru.onnx" 
+            : MODEL_LINKS[engine];
+            
         if(!url) return this.logToast("Движок не поддерживается", "error");
         
         this.clearToasts();
         let t = this.logToast(`Качаем голос [${engine}]...`, "ok", 0);
 
-        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
-
         try {
-            // В АПК пускаем напрямую (плагин сам обойдет CORS), в Вебе - через прокси
-            let fetchUrl = isAPK ? url : ("https://corsproxy.io/?" + encodeURIComponent(url));
-            
-            const res = await fetch(fetchUrl);
+            // Качаем напрямую, браузер это пропустит
+            const res = await fetch(url);
             if (!res.ok) throw new Error("Сервер недоступен");
             
             const reader = res.body.getReader();
             let chunks = [];
             let loaded = 0;
-            const total = parseInt(res.headers.get('content-length')) || 45000000;
+            const total = parseInt(res.headers.get('content-length')) || 46300000;
 
             while(true) {
                 const {done, value} = await reader.read();
@@ -999,6 +1000,7 @@ const app = {
             this.logToast("Сбой загрузки файла.", "error");
         }
     },
+
 
     async playOfflineModel(text, engine) {
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
