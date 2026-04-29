@@ -6,15 +6,57 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="referrer" content="no-referrer">
-    <title>NeonReader: Ultimate Cyberpunk Core</title>
+    <title>NeonReader: PRO Debug Edition</title>
+    
+    <script>
+        window.appLogs = [];
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+
+        function printToDevConsole(msg, color) {
+            const list = document.getElementById('dev-console-list');
+            if(!list) {
+                window.appLogs.push({msg, color}); 
+                return;
+            }
+            const el = document.createElement('div');
+            el.style.color = color;
+            el.style.padding = '4px 0';
+            el.style.borderBottom = '1px solid #333';
+            el.style.wordBreak = 'break-all';
+            
+            const time = new Date().toLocaleTimeString() + '.' + new Date().getMilliseconds().toString().padStart(3, '0');
+            el.innerText = `[${time}] ${msg}`;
+            list.appendChild(el);
+            list.scrollTop = list.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#0f0');
+        };
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#ff0');
+        };
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#f00');
+        };
+
+        window.onerror = function(msg, url, line) {
+            console.error(`КРАШ JS: ${msg} на строке ${line}`);
+            return false;
+        };
+        window.onunhandledrejection = function(event) {
+            console.error(`ТИХАЯ ОШИБКА (Promise): ${event.reason}`);
+        };
+    </script>
     
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
-        
-        // Оптимизируем WebAssembly для мобилок (ограничиваем 1 потоком, чтобы не было крашей памяти)
         env.backends.onnx.wasm.numThreads = 1;
-        
-        // Прокидываем пайплайн в глобальную область, чтобы наш app мог его вызывать
         window.NeuralTTS = { pipeline };
     </script>
     
@@ -60,6 +102,15 @@
         .icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .icon-sm { width: 16px; height: 16px; }
         .icon-fill { fill: currentColor; stroke: none; }
+
+        /* Консоль Разработчика */
+        #dev-console-modal {
+            display: none; position: fixed; inset: 0; z-index: 999999;
+            background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); flex-direction: column;
+            padding: calc(env(safe-area-inset-top) + 10px) 10px 20px 10px; font-family: monospace; font-size: 11px;
+        }
+        #dev-console-header { display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #333; color: #fff; font-weight: bold; }
+        #dev-console-list { flex: 1; overflow-y: auto; padding-top: 10px; }
 
         #toast-container { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 50%; transform: translateX(-50%); z-index: 99999; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 400px; align-items: center; pointer-events: none; }
         .toast {
@@ -194,6 +245,14 @@
 <div id="bg-glow"></div>
 <div id="toast-container"></div>
 
+<div id="dev-console-modal">
+    <div id="dev-console-header">
+        <span>F12 DEBUG LOGS</span>
+        <button onclick="document.getElementById('dev-console-modal').style.display='none'" style="color:var(--danger); background:none; border:1px solid var(--danger); padding:4px 8px; font-weight:bold; cursor:pointer;">ЗАКРЫТЬ</button>
+    </div>
+    <div id="dev-console-list"></div>
+</div>
+
 <div id="captcha-modal">
     <div class="captcha-header">
         <div class="captcha-title">
@@ -230,11 +289,14 @@
             Neon<span>Reader</span>
         </div>
         <div class="tools">
+            <button class="action-btn btn-icon" onclick="document.getElementById('dev-console-modal').style.display='flex'" title="Логи">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
             <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             </button>
             <button class="action-btn btn-icon" onclick="app.toggleSettings()" title="Настройки Контроля">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
         </div>
     </div>
@@ -354,6 +416,16 @@
 </footer>
 
 <script>
+// Выводим накопленные логи при старте
+window.onload = async () => {
+    const list = document.getElementById('dev-console-list');
+    window.appLogs.forEach(l => printToDevConsole(l.msg, l.color));
+    window.appLogs = [];
+    
+    console.log("=== ИНИЦИАЛИЗАЦИЯ NEON READER ===");
+    await app.init();
+};
+
 // УБИВАЕМ ЗАСТРЯВШИЙ СЕРВИС-ВОРКЕР
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -361,7 +433,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Оптимизированная БД только для книг (модели теперь кэширует сам transformers.js)
 const NeonDB = {
     db: null,
     async init() {
@@ -419,7 +490,16 @@ const app = {
     captchaPendingUrl: null,
 
     async init() {
+        console.log("Шаг 1: Инициализация БД...");
         await NeonDB.init();
+        
+        console.log("Шаг 2: Проверка среды (APK/Web)...");
+        if (window.Capacitor) {
+            console.log("ОБНАРУЖЕН АПК. Доступные плагины: " + Object.keys(window.Capacitor.Plugins).join(', '));
+        } else {
+            console.log("ОБНАРУЖЕН БРАУЗЕР (Веб-режим)");
+        }
+
         this.loadSettings();
         this.loadSitesData();
         this.loadLibraryData();
@@ -436,13 +516,23 @@ const app = {
         this.updateSiteTemplate();
         this.checkModelStatus();
 
-        // Авто-загрузка
+        console.log("Шаг 3: Загрузка нейросети (transformers.js)...");
+        try {
+            const module = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0');
+            module.env.backends.onnx.wasm.numThreads = 1;
+            window.NeuralTTS = { pipeline: module.pipeline };
+            console.log("✅ Нейросеть успешно подгружена в ядро!");
+        } catch(e) {
+            console.error("❌ Сбой подгрузки нейросети: " + e.message);
+        }
+
         const savedSession = localStorage.getItem('neon_pro_save');
         if(savedSession) {
             try {
                 const data = JSON.parse(savedSession);
                 if(data.url) {
                     document.getElementById('url-input').value = data.url;
+                    console.log("Запуск сохраненной сессии...");
                     this.processChapter().then(() => {
                         if(data.index !== undefined) setTimeout(() => this.play(data.index), 800);
                     });
@@ -457,6 +547,7 @@ const app = {
     },
 
     logToast(msg, type = 'ok', duration = 3000) {
+        console.log(`[TOAST] ${msg}`);
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
@@ -689,6 +780,7 @@ const app = {
 
     async networkFetchCore(url, site) {
         this.clearToasts(); 
+        console.log(`=== СТАРТ ЗАГРУЗКИ: ${url} ===`);
         let t = this.logToast(`Инициализация загрузки...`, 'ok', 0);
         
         let html = "";
@@ -704,6 +796,7 @@ const app = {
                 }
 
                 t.querySelector('span').innerText = `АПК: Запрос к сайту...`;
+                console.log("АПК: Начинаем нативный HTTP запрос");
                 
                 try {
                     const options = {
@@ -717,6 +810,7 @@ const app = {
                     const res = await window.Capacitor.Plugins.CapacitorHttp.get(options);
                     
                     t.querySelector('span').innerText = `АПК: Ответ HTTP ${res.status}`;
+                    console.log(`АПК: Ответ получен, статус: ${res.status}`);
                     
                     if (res.status !== 200 && res.status !== 201) {
                         throw new Error(`Сервер вернул статус ${res.status}`);
@@ -725,21 +819,25 @@ const app = {
                     html = res.data;
                     
                     if (typeof html !== 'string') {
+                        console.warn("Данные пришли как JSON/объект, сериализуем...");
                         html = JSON.stringify(html);
                     }
 
                     if (html && html.length > 500) {
                         success = true;
+                        console.log(`АПК: Успех, скачано ${html.length} байт`);
                     } else {
                         throw new Error(`Пришел пустой или короткий ответ (${html ? html.length : 0} байт)`);
                     }
 
                 } catch (apkErr) {
+                    console.error("NATIVE ERROR:", apkErr);
                     throw new Error(`NATIVE: ${apkErr.message || JSON.stringify(apkErr)}`);
                 }
 
             } else {
                 t.querySelector('span').innerText = `ВЕБ: Проксируем запрос...`;
+                console.log("ВЕБ: Используем прокси-запросы...");
                 const endpoints = [
                     url, 
                     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
@@ -748,6 +846,7 @@ const app = {
 
                 for (let ep of endpoints) {
                     try {
+                        console.log(`Попытка эндпоинта: ${ep}`);
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 8000);
                         
@@ -755,6 +854,7 @@ const app = {
                         clearTimeout(timeoutId);
                         
                         let text = await res.text();
+                        console.log(`Ответ от прокси: статус ${res.status}, длина ${text.length}`);
                             
                         if (text.trim().startsWith('{') && text.includes('"contents"')) {
                             try { text = JSON.parse(text).contents; } catch(e){}
@@ -762,6 +862,7 @@ const app = {
 
                         if (text.includes('<title>Just a moment...</title>') || text.includes('id="challenge-running"')) {
                             t.remove();
+                            console.warn("Поймали Cloudflare Captcha!");
                             this.openCaptchaModal(url);
                             throw new Error("BLOCK_CLOUDFLARE");
                         }
@@ -773,20 +874,26 @@ const app = {
                         }
                     } catch(e) {
                         if (e.message === "BLOCK_CLOUDFLARE") throw e;
+                        console.warn("Эндпоинт отвалился:", e.message);
                     }
                 }
             }
         } catch (e) {
             if (e.message === "BLOCK_CLOUDFLARE") throw e;
             t.remove();
+            console.error("ФАТАЛЬНЫЙ СБОЙ ЗАГРУЗКИ:", e);
             this.logToast(`СБОЙ: ${e.message}`, "error", 10000);
             throw e;
         }
 
         t.remove();
-        if (!success) throw new Error("Сбой: Таймаут или сайт не ответил.");
+        if (!success) {
+            console.error("Таймаут или все прокси отвалились");
+            throw new Error("Сбой: Таймаут или сайт не ответил.");
+        }
 
         this.logToast(`Парсинг DOM...`, 'ok', 500);
+        console.log("Начинаем парсинг текста из HTML...");
 
         const doc = new DOMParser().parseFromString(html, 'text/html');
         let sel = 'p';
@@ -798,6 +905,7 @@ const app = {
         let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(text => text.length > 20);
         if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(text => text.length > 30);
         
+        console.log(`Найдено абзацев: ${paras.length}`);
         if (paras.length === 0) {
             this.logToast("СБОЙ: Текст не найден в разметке сайта.", "error", 10000);
             throw new Error("Текст не найден.");
@@ -812,6 +920,7 @@ const app = {
             }
         });
         
+        console.log(`Следующая глава: ${nUrl || "Не найдена"}`);
         return { 
             text: paras.join('\n\n'), 
             nextUrl: nUrl, 
@@ -873,6 +982,7 @@ const app = {
     },
 
     async processChapter() {
+        console.log("=== ЧТЕНИЕ ГЛАВЫ ===");
         this.stop();
         this.audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
         this.audio.play().catch(()=>{});
@@ -882,16 +992,20 @@ const app = {
         const mode = document.getElementById('mode-select').value; 
         const site = document.getElementById('site-select').value;
 
+        if(!url) return console.warn("Ссылка пустая!");
+
         let rawText = "";
         let isAlreadyTranslated = false;
         this.currentBookMetadata = { title: '', cover: '' };
             
         let tDb = this.logToast("Проверка кэша...", "ok", 0);
+        console.log("Ищем главу в IndexedDB...");
         const dbData = await NeonDB.getChapter(url);
         
         if (dbData) {
             tDb.remove();
             this.logToast("Извлечено из памяти", "ok");
+            console.log("Найдено в кэше!");
             rawText = dbData.text;
             this.nextUrl = dbData.nextUrl;
             
@@ -902,6 +1016,7 @@ const app = {
         } else {
             tDb.remove();
             try {
+                console.log("В кэше нет. Качаем из сети...");
                 const data = await this.networkFetchCore(url, site);
                 rawText = data.text;
                 this.nextUrl = data.nextUrl;
@@ -917,12 +1032,14 @@ const app = {
         if (mode === "translate" && !isAlreadyTranslated) {
             this.clearToasts();
             let tTr = this.logToast("Нейроперевод...", "ok", 0);
+            console.log("Начинаем перевод текста...");
             try {
                 const translatedText = await this.translate(rawText);
                 this.render(translatedText);
                 tTr.remove();
                 this.logToast("Готово. Плеер ожидает.", "ok");
             } catch (e) { 
+                console.error("Ошибка перевода:", e);
                 tTr.remove();
                 this.logToast("Сбой перевода.", "error"); 
             }
@@ -940,6 +1057,7 @@ const app = {
         const chunks = text.match(/[\s\S]{1,1500}(?=\n\n|$)/g) || [text];
         let result = "";
         for (let i = 0; i < chunks.length; i++) {
+            console.log(`Перевод чанка ${i+1}/${chunks.length}`);
             const tUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=ru&dt=t&q=${encodeURIComponent(chunks[i])}`;
             const r = await fetch(tUrl); const d = await r.json();
             result += d[0].map(x => x[0]).join('') + "\n\n";
@@ -949,6 +1067,7 @@ const app = {
     },
 
     render(text) {
+        console.log("Рендер текста...");
         const container = document.getElementById('reader-container');
         container.innerHTML = '';
         this.sents = [];
@@ -966,9 +1085,9 @@ const app = {
             container.appendChild(pDiv);
         });
         this.currentIndex = -1; this.updateUI();
+        console.log(`Рендер завершен. Всего предложений: ${this.sents.length}`);
     },
 
-    // ПРОВЕРКА КЭША TRANSFORMERS.JS
     async checkModelStatus() {
         const engine = document.getElementById('voice-engine-select').value;
         const btn = document.getElementById('dl-model-btn');
@@ -983,49 +1102,53 @@ const app = {
         }
     },
 
-    // ЗАГРУЗКА VITS (MMS RUS) ЧЕРЕЗ TRANSFORMERS.JS
     async downloadLocalModel() {
+        console.log("Запрошена загрузка VITS...");
         if (!window.NeuralTTS) return this.logToast("Ядро загружается, подожди секунду...", "error");
         
         let t = this.logToast(`Качаем VITS (35 МБ)... Экран не гасить!`, "ok", 0);
 
         try {
-            // Эта магия скачает модель с HF и навсегда закэширует в браузере
+            console.log("Старт pipeline HF...");
             window.appSynthesizer = await window.NeuralTTS.pipeline('text-to-speech', 'Xenova/mms-tts-rus', {
                 quantized: true,
                 progress_callback: (x) => {
                     if (x.status === 'progress' && x.name.includes('onnx')) {
                         let pct = Math.round((x.loaded / x.total) * 100);
+                        console.log(`Загрузка VITS: ${pct}%`);
                         t.querySelector('span').innerText = `Загрузка: ${pct}%`;
                     }
                 }
             });
             
             t.remove();
+            console.log("VITS успешно закэширован.");
             this.logToast("VITS УСТАНОВЛЕН И ЗАКЭШИРОВАН", "ok");
             localStorage.setItem('vits_installed', 'true');
             this.checkModelStatus();
         } catch(e) {
+            console.error("ОШИБКА СКАЧИВАНИЯ VITS:", e);
             t.remove();
             this.logToast("Сбой загрузки: " + e.message, "error");
         }
     },
 
-    // ГЕНЕРАЦИЯ ЗВУКА VITS В БРАУЗЕРЕ
     async playVITSModel(text) {
+        console.log("Генерация VITS началась...");
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.clearToasts();
         
         let t = this.logToast(`VITS синтезирует...`, "ok", 0);
         
         try {
-            // Если мы обновили страницу, но модель в кэше есть — подгружаем её тихо
             if (!window.appSynthesizer) {
+                console.log("Поднимаем VITS из кэша...");
                 window.appSynthesizer = await window.NeuralTTS.pipeline('text-to-speech', 'Xenova/mms-tts-rus', { quantized: true });
             }
 
-            // Нейронка генерирует звук
+            console.log("Отдаем текст нейросети...");
             const out = await window.appSynthesizer(text);
+            console.log("Звук сгенерирован!");
             
             const audioData = out.audio; 
             const sampleRate = out.sampling_rate;
@@ -1041,12 +1164,13 @@ const app = {
             this.audioSource.playbackRate.value = currentSpeed;
 
             this.audioSource.connect(this.audioCtx.destination);
-            this.audioSource.onended = () => { if(this.isPlaying) this.jump(1); };
+            this.audioSource.onended = () => { console.log("Предложение прочитано."); if(this.isPlaying) this.jump(1); };
             
             t.remove();
             this.audioSource.start();
             this.isPlaying = true; this.updateUI();
         } catch(e) {
+            console.error("КРАШ VITS:", e);
             t.remove();
             this.logToast("Ошибка VITS: " + e.message, "error");
             this.stop();
@@ -1054,11 +1178,14 @@ const app = {
     },
 
     async play(index) {
+        console.log(`Играем индекс: ${index}`);
         if (index < 0 || index >= this.sents.length) return this.stop();
         this.currentIndex = index; this.updateUI();
         const voice = document.getElementById('voice-engine-select').value;
         const text = this.sents[index];
         
+        console.log(`Движок: ${voice}. Текст: ${text.substring(0, 30)}...`);
+
         if (voice === 'google') {
             this.playGoogle(text);
         } else if (voice === 'alisa') {
@@ -1073,6 +1200,7 @@ const app = {
     },
 
     playGoogle(text) {
+        console.log("Google TTS старт.");
         window.speechSynthesis.cancel();
         const utt = new SpeechSynthesisUtterance(text); utt.lang = 'ru-RU';
         utt.rate = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
@@ -1083,6 +1211,7 @@ const app = {
     },
 
     async playAlisa(text) {
+        console.log("Запрос Алисы (Яндекс)...");
         const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0).toFixed(1);
         const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=${speed}`;
         
@@ -1090,10 +1219,12 @@ const app = {
 
         try { 
             if (isAPK) {
+                console.log("АПК: Прямая ссылка");
                 this.audio.src = ttsUrl; 
                 this.audio.playbackRate = parseFloat(speed);
                 await this.audio.play(); 
             } else {
+                console.log("ВЕБ: Прокси-запрос Алисы");
                 const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`;
                 const res = await fetch(proxyUrl); 
                 if (!res.ok) throw new Error();
@@ -1107,6 +1238,7 @@ const app = {
             this.isPlaying = true; 
             this.updateUI(); 
         } catch (err) {
+            console.error("ОШИБКА АЛИСЫ:", err);
             this.clearToasts();
             this.logToast("Яндекс отказ. Включен Google TTS.", "error");
             document.getElementById('voice-engine-select').value = 'google';
@@ -1120,14 +1252,19 @@ const app = {
             return this.logToast("Сначала загрузи главу!", "error");
         }
         if (this.isPlaying) { 
+            console.log("Кнопка: Пауза");
             if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
             this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; 
         } 
-        else { this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); }
+        else { 
+            console.log("Кнопка: Плей");
+            this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); 
+        }
         this.updateUI();
     },
 
     stop() { 
+        console.log("Полная остановка.");
         if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
         this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; this.updateUI(); 
     },
@@ -1155,6 +1292,7 @@ const app = {
     },
     
     nextChapter() { 
+        console.log("Переход на следующую главу.");
         if (this.nextUrl) { 
             document.getElementById('url-input').value = this.nextUrl; 
             this.processChapter(); 
@@ -1183,7 +1321,14 @@ const app = {
     }
 };
 
-window.onload = () => app.init();
+window.onload = async () => {
+    const list = document.getElementById('dev-console-list');
+    window.appLogs.forEach(l => printToDevConsole(l.msg, l.color));
+    window.appLogs = [];
+    
+    console.log("=== ИНИЦИАЛИЗАЦИЯ NEON READER ===");
+    await app.init();
+};
 </script>
 </body>
 </html>
