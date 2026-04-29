@@ -194,7 +194,7 @@
         main { flex: 1; overflow-y: auto; padding: 10px 15px 180px 15px; line-height: 1.7; font-size: 18px; scroll-behavior: smooth; position: relative; }
         main::after { content: ''; position: fixed; bottom: 0; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, var(--bg-base)); pointer-events: none; z-index: 1; }
         
-        .paragraph { margin-bottom: 6px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        .paragraph { margin-bottom: 20px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .sentence { cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; position: relative; }
@@ -205,6 +205,7 @@
             width: 94%; max-width: 450px; border-radius: 20px; padding: 12px 15px; z-index: 100; 
         }
 
+        /* Двойной прогресс-бар */
         .progress-container { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 12px; overflow: hidden; position: relative; cursor: pointer; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8); }
         #progress-cached { position: absolute; top: 0; left: 0; height: 100%; background: var(--theme-cached-hex); width: 0%; opacity: 0.4; box-shadow: 0 0 10px var(--theme-cached-hex); transition: width 0.5s; z-index: 1; }
         #progress-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--theme-hex); width: 0%; transition: width 0.2s ease-out; box-shadow: 0 0 calc(10px * var(--glow-int)) var(--theme-hex); z-index: 2; }
@@ -286,7 +287,7 @@
         </div>
         <div class="tools">
             <button class="action-btn btn-icon" onclick="document.getElementById('dev-console-modal').style.display='flex'" title="Логи">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
             <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
@@ -485,8 +486,8 @@ const NeonDB = {
 
 const app = {
     sents: [], currentIndex: -1, isPlaying: false,
-    audio: new Audio(), 
-    audioCtx: null, nextStartTime: 0, currentBufferSource: null, audioBufferCache: {}, // Для бесшовного сшивания
+    audio: new Audio(), preloadedAudio: new Audio(), preloadedIndex: -1,
+    audioCtx: null, nextStartTime: 0, currentBufferSource: null, audioBufferCache: {},
     reconnectTimer: null,
     nextUrl: null, prevUrl: null, currentBookId: 'current',
     chapterMarkers: [], isFetchingNext: false,
@@ -537,6 +538,7 @@ const app = {
                 
                 this.reconnectTimer = setTimeout(() => {
                     if (this.isPlaying) {
+                        this.preloadedIndex = -1; // Сбрасываем битый кэш
                         this.play(this.currentIndex);
                     }
                 }, 3000);
@@ -645,6 +647,7 @@ const app = {
         };
         localStorage.setItem('neon_custom_ui', JSON.stringify(conf));
         this.applySettingsUI(conf);
+        if (this.audio) this.audio.playbackRate = parseFloat(conf.speed);
     },
 
     applySettingsUI(conf) {
@@ -1082,6 +1085,7 @@ const app = {
                 this.prevUrl = data.prevUrl;
                 this.currentBookMetadata.title = data.title;
                 this.currentBookMetadata.cover = data.cover;
+                // Сохраняем оригинал
                 await NeonDB.saveChapter(url, this.currentBookId, rawText, data.nextUrl, data.prevUrl);
             } catch (e) { 
                 if (e.message.includes("Требуется обход защиты")) return;
@@ -1099,6 +1103,7 @@ const app = {
             let tTr = this.logToast("Нейроперевод...", "ok", 0);
             try {
                 finalText = await this.translate(rawText);
+                // Перезаписываем перевод
                 await NeonDB.saveChapter(url, this.currentBookId, finalText, this.nextUrl, this.prevUrl);
                 this.render(finalText, isAppend, chapterLabel);
                 tTr.remove();
@@ -1141,13 +1146,13 @@ const app = {
             this.chapterMarkers = [];
             this.currentIndex = -1;
             container.scrollTop = 0;
-            this.audioBufferCache = {}; // Очистка кэша аудио при новой главе
+            this.audioBufferCache = {}; 
         }
 
         if(!this.chapterMarkers) this.chapterMarkers = [];
         this.chapterMarkers.push({ index: this.sents.length, title: chapterTitle });
 
-        // Жесткий лимит для Google Premium, чтобы не ловить DOMException
+        // Жесткий лимит для Google Premium
         const chunkSize = 200; 
         
         let cleanedText = text.replace(/\n\s*\n/g, '\n');
@@ -1200,44 +1205,54 @@ const app = {
     },
 
     getGoogleTTSUrl(text) {
-        // Убираем скорость из URL, так как скорость теперь задается напрямую в AudioContext.playbackRate
         return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ru&client=tw-ob`;
     },
 
-    // Функция скачивания и конвертации в AudioBuffer для бесшовности
     async getAudioBuffer(text) {
         const ttsUrl = this.getGoogleTTSUrl(text);
-        let arrayBuffer;
+        let arrayBuffer = null;
 
         try {
-            // Если мы в APK, используем нативный HTTP чтобы обойти CORS
             if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
                 const res = await window.Capacitor.Plugins.CapacitorHttp.get({
                     url: ttsUrl,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': '*/*'
+                    },
                     responseType: 'arraybuffer'
                 });
-                const binaryString = window.atob(res.data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
+                
+                if (res.status === 200 && res.data) {
+                    let base64Str = res.data;
+                    if (base64Str.includes(',')) base64Str = base64Str.split(',')[1];
+                    
+                    const binaryString = window.atob(base64Str);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    arrayBuffer = bytes.buffer;
+                } else {
+                    throw new Error("HTTP Status: " + res.status);
                 }
-                arrayBuffer = bytes.buffer;
             } else {
-                throw new Error("Not in APK");
+                throw new Error("Browser Env");
             }
         } catch (e) {
-            // Если в обычном браузере — используем надежный прокси для бинарников
+            console.warn("NATIVE audio fetch failed, trying proxy...", e);
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`;
             const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error("CORS Proxy Failed");
+            if (!res.ok) throw new Error("Proxy failed");
             arrayBuffer = await res.arrayBuffer();
         }
+
+        if (!arrayBuffer || arrayBuffer.byteLength < 100) throw new Error("Пустой аудио буфер");
 
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         return await this.audioCtx.decodeAudioData(arrayBuffer);
     },
 
-    // Предзагрузка, чтобы избежать пауз при скачивании
     preloadAudio(text) {
         if (!this.audioBufferCache[text]) {
             this.audioBufferCache[text] = this.getAudioBuffer(text);
@@ -1262,7 +1277,6 @@ const app = {
 
         if (index < 0) return this.stop();
         
-        // Сброс очереди при ручном переходе (ты кликнул в текст или нажал кнопку)
         if (this.currentIndex !== index - 1) {
             this.nextStartTime = 0;
             if (this.currentBufferSource) {
@@ -1277,61 +1291,73 @@ const app = {
         const voice = document.getElementById('voice-engine-select').value;
         const text = this.sents[index];
         const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
+        const ttsUrl = this.getGoogleTTSUrl(text);
         
-        if (voice === 'quality') { // Бесшовный сшиватель
+        if (voice === 'quality') { 
             try {
-                // Ждем буфер (если предзагружен - вернется мгновенно)
                 const buffer = await this.preloadAudio(text);
                 
                 if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
                 const source = this.audioCtx.createBufferSource();
                 source.buffer = buffer;
-                source.playbackRate.value = speed; // Задаем скорость сшивания
+                source.playbackRate.value = speed; 
                 source.connect(this.audioCtx.destination);
                 
-                // Вычисляем время старта
                 const currentTime = this.audioCtx.currentTime;
                 if (this.nextStartTime < currentTime) {
-                    this.nextStartTime = currentTime + 0.05; // 50 миллисекунд задел
+                    this.nextStartTime = currentTime + 0.05; 
                 }
                 
-                // Запускаем точно по таймеру
                 source.start(this.nextStartTime);
                 this.currentBufferSource = source;
                 
-                // Время следующего старта (зависит от скорости воспроизведения)
                 const duration = buffer.duration / speed;
                 this.nextStartTime += duration;
                 
                 this.isPlaying = true;
                 
                 source.onended = () => {
-                    // Переход к следующему чанку, если плеер не остановлен
-                    if (this.isPlaying && this.currentIndex === index) {
-                        this.jump(1);
-                    }
+                    if (this.isPlaying && this.currentIndex === index) this.jump(1);
                 };
 
-                // Закидываем в память следующие куски
                 if (index + 1 < this.sents.length) this.preloadAudio(this.sents[index + 1]).catch(()=>{});
                 if (index + 2 < this.sents.length) this.preloadAudio(this.sents[index + 2]).catch(()=>{});
 
             } catch (e) {
-                console.error("Ошибка аудио сшивания:", e);
-                // Тихий автореконнект
-                if (!this.isPlaying) return;
-                const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || {};
-                if (conf.autoresume !== false) {
-                    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-                    this.reconnectTimer = setTimeout(() => {
-                        if (this.isPlaying) this.play(this.currentIndex);
-                    }, 3000);
+                console.warn("Сшиватель отвалился (CORS/Декод). Включаю гибридный классический режим...", e);
+                
+                if (this.preloadedIndex === index && this.preloadedAudio.src) {
+                    this.audio.src = this.preloadedAudio.src;
                 } else {
-                    this.stop();
+                    this.audio.src = ttsUrl;
                 }
+                this.audio.playbackRate = speed;
+                this.audio.play().catch(err => {
+                    console.error("Критический сбой аудио:", err);
+                    if (!this.isPlaying) return;
+                    const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || {};
+                    if (conf.autoresume !== false) {
+                        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+                        this.reconnectTimer = setTimeout(() => {
+                            if (this.isPlaying) this.play(this.currentIndex);
+                        }, 3000);
+                    } else {
+                        this.stop();
+                    }
+                });
+                this.isPlaying = true;
+
+                if (index + 1 < this.sents.length) {
+                    this.preloadedIndex = index + 1;
+                    this.preloadedAudio.src = this.getGoogleTTSUrl(this.sents[index + 1]);
+                }
+                
+                this.audio.onended = () => {
+                    if (this.isPlaying && this.currentIndex === index) this.jump(1);
+                };
             }
-        } else { // Системный Оффлайн
+        } else { 
             if (this.currentBufferSource) {
                 this.currentBufferSource.onended = null;
                 try { this.currentBufferSource.stop(); } catch(e){}
@@ -1368,6 +1394,7 @@ const app = {
                 try { this.currentBufferSource.stop(); } catch(e){}
             }
             this.nextStartTime = 0;
+            this.audio.pause(); 
             if(window.speechSynthesis) window.speechSynthesis.cancel(); 
             this.isPlaying = false; 
         } 
@@ -1388,6 +1415,7 @@ const app = {
             try { this.currentBufferSource.stop(); } catch(e){}
         }
         this.nextStartTime = 0;
+        this.audio.pause(); 
         if(window.speechSynthesis) window.speechSynthesis.cancel(); 
         this.isPlaying = false; 
         this.updateUI(); 
