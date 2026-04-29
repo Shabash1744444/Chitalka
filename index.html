@@ -8,7 +8,15 @@
     <meta name="referrer" content="no-referrer">
     <title>NeonReader: Ultimate Cyberpunk Core</title>
     
-    <script src="ort.min.js"></script>
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+        
+        // Оптимизируем WebAssembly для мобилок (ограничиваем 1 потоком, чтобы не было крашей памяти)
+        env.backends.onnx.wasm.numThreads = 1;
+        
+        // Прокидываем пайплайн в глобальную область, чтобы наш app мог его вызывать
+        window.NeuralTTS = { pipeline };
+    </script>
     
     <style>
         :root {
@@ -226,7 +234,7 @@
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
             </button>
             <button class="action-btn btn-icon" onclick="app.toggleSettings()" title="Настройки Контроля">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
         </div>
     </div>
@@ -278,7 +286,7 @@
             <select id="voice-engine-select" class="custom-input" style="margin-bottom: 10px;" onchange="app.checkModelStatus()">
                 <option value="google">Google TTS</option>
                 <option value="alisa">Yandex Alisa</option>
-                <option value="silero" selected>Silero (V4 RU)</option>
+                <option value="vits" selected>VITS (MMS Rus)</option>
             </select>
             
             <div class="setting-row" style="margin-bottom: 12px; background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.05);">
@@ -288,9 +296,9 @@
             </div>
 
             <button id="dl-model-btn" class="action-btn btn-main" style="width: 100%; display: none;" onclick="app.downloadLocalModel()">
-                УСТАНОВИТЬ ГОЛОС
+                СКАЧАТЬ VITS (35 МБ)
             </button>
-            <div id="model-ok-label" style="display: none; color: var(--success); font-size: 11px; font-weight: 800; text-align: center; margin-top: 5px;">✅ АВТОНОМНОЕ ЯДРО В ПАМЯТИ</div>
+            <div id="model-ok-label" style="display: none; color: var(--success); font-size: 11px; font-weight: 800; text-align: center; margin-top: 5px;">✅ VITS ЯДРО В ПАМЯТИ</div>
         </div>
 
         <div class="settings-section">
@@ -349,41 +357,20 @@
 // УБИВАЕМ ЗАСТРЯВШИЙ СЕРВИС-ВОРКЕР
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-            registration.unregister();
-        }
+        for (let registration of registrations) { registration.unregister(); }
     });
 }
 
-// Защита от фатального краша интерфейса
-if (typeof ort !== 'undefined') {
-
-    ort.env.logLevel = 'error';
-    ort.env.wasm.numThreads = 1; 
-    ort.env.wasm.wasmPaths = './'; 
-} else {
-    console.warn("Файл ort.min.js не найден, но интерфейс продолжит работать.");
-}
-
-const MODEL_LINKS = {
-    silero: "https://models.silero.ai/models/tts/ru/v4_ru.onnx"
-};
-
-// Вшитые токены для Silero V4
-const SILERO_TOKENS = {" ": 1, "!": 2, "-": 3, ".": 4, "0": 5, "1": 6, "2": 7, "3": 8, "4": 9, "5": 10, "6": 11, "7": 12, "8": 13, "9": 14, "?": 15, "а": 16, "б": 17, "в": 18, "г": 19, "д": 20, "е": 21, "ж": 22, "з": 23, "и": 24, "й": 25, "к": 26, "л": 27, "м": 28, "н": 29, "о": 30, "п": 31, "р": 32, "с": 33, "т": 34, "у": 35, "ф": 36, "х": 37, "ц": 38, "ч": 39, "ш": 40, "щ": 41, "ъ": 42, "ы": 43, "ь": 44, "э": 45, "ю": 46, "я": 47, "ё": 48};
-
+// Оптимизированная БД только для книг (модели теперь кэширует сам transformers.js)
 const NeonDB = {
     db: null,
     async init() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open("NeonReaderDB", 2);
+            const req = indexedDB.open("NeonReaderDB", 3);
             req.onupgradeneeded = (e) => {
                 this.db = e.target.result;
                 if (!this.db.objectStoreNames.contains("chapters")) {
                     this.db.createObjectStore("chapters", { keyPath: "url" });
-                }
-                if (!this.db.objectStoreNames.contains("models")) {
-                    this.db.createObjectStore("models", { keyPath: "id" });
                 }
             };
             req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
@@ -417,21 +404,6 @@ const NeonDB = {
                     cursor.continue();
                 } else resolve();
             };
-        });
-    },
-    async saveModel(id, blob) {
-        return new Promise((resolve) => {
-            const tx = this.db.transaction("models", "readwrite");
-            tx.objectStore("models").put({ id: id, data: blob });
-            tx.oncomplete = () => resolve();
-        });
-    },
-    async getModel(id) {
-        return new Promise((resolve) => {
-            const tx = this.db.transaction("models", "readonly");
-            const req = tx.objectStore("models").get(id);
-            req.onsuccess = () => resolve(req.result ? req.result.data : null);
-            req.onerror = () => resolve(null);
         });
     }
 };
@@ -514,7 +486,6 @@ const app = {
                 }
             }, duration);
         }
-        
         return toast; 
     },
 
@@ -716,25 +687,20 @@ const app = {
         }
     },
 
-    // ГИБРИДНЫЙ ПАРСЕР (АПК + ВЕБ)
     async networkFetchCore(url, site) {
         this.clearToasts(); 
         let t = this.logToast(`Загрузка главы...`, 'ok', 0);
-        
         let html = "";
         let success = false;
         
-        // Проверяем, запущены ли мы внутри APK (Capacitor)
         const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
 
         try {
             if (isAPK) {
-                // Прямой вызов через нативный плагин АПК (обходит все CORS на уровне системы)
                 const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url: url });
                 html = res.data;
                 if (html && html.length > 500) success = true;
             } else {
-                // Если мы на GitHub Pages (Веб), пускаем через прокси
                 const endpoints = [
                     url, 
                     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
@@ -954,90 +920,69 @@ const app = {
         this.currentIndex = -1; this.updateUI();
     },
 
+    // ПРОВЕРКА КЭША TRANSFORMERS.JS
     async checkModelStatus() {
         const engine = document.getElementById('voice-engine-select').value;
         const btn = document.getElementById('dl-model-btn');
         const label = document.getElementById('model-ok-label');
         
-        if (engine === 'silero') {
-            const stored = await NeonDB.getModel(engine);
-            btn.style.display = stored ? 'none' : 'flex';
-            label.style.display = stored ? 'block' : 'none';
+        if (engine === 'vits') {
+            const isInstalled = localStorage.getItem('vits_installed') === 'true';
+            btn.style.display = isInstalled ? 'none' : 'flex';
+            label.style.display = isInstalled ? 'block' : 'none';
         } else {
             btn.style.display = 'none'; label.style.display = 'none';
         }
     },
 
-    // ГИБРИДНАЯ ЗАГРУЗКА ГОЛОСА (АПК + ВЕБ)
-        async downloadLocalModel() {
-        const engine = document.getElementById('voice-engine-select').value;
+    // ЗАГРУЗКА VITS (MMS RUS) ЧЕРЕЗ TRANSFORMERS.JS
+    async downloadLocalModel() {
+        if (!window.NeuralTTS) return this.logToast("Ядро загружается, подожди секунду...", "error");
         
-        // Зеркало на HuggingFace без лимитов и CORS
-        let url = engine === 'silero' 
-            ? "https://huggingface.co/simrat39/silero-tts-onnx-ru/resolve/main/v4_ru.onnx" 
-            : MODEL_LINKS[engine];
-            
-        if(!url) return this.logToast("Движок не поддерживается", "error");
-        
-        this.clearToasts();
-        let t = this.logToast(`Качаем голос [${engine}]...`, "ok", 0);
+        let t = this.logToast(`Качаем VITS (35 МБ)... Экран не гасить!`, "ok", 0);
 
         try {
-            // Качаем напрямую, браузер это пропустит
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("Сервер недоступен");
+            // Эта магия скачает модель с HF и навсегда закэширует в браузере
+            window.appSynthesizer = await window.NeuralTTS.pipeline('text-to-speech', 'Xenova/mms-tts-rus', {
+                quantized: true,
+                progress_callback: (x) => {
+                    if (x.status === 'progress' && x.name.includes('onnx')) {
+                        let pct = Math.round((x.loaded / x.total) * 100);
+                        t.querySelector('span').innerText = `Загрузка: ${pct}%`;
+                    }
+                }
+            });
             
-            const reader = res.body.getReader();
-            let chunks = [];
-            let loaded = 0;
-            const total = parseInt(res.headers.get('content-length')) || 46300000;
-
-            while(true) {
-                const {done, value} = await reader.read();
-                if (done) break;
-                chunks.push(value);
-                loaded += value.length;
-                let percent = Math.min(Math.round((loaded/total)*100), 100);
-                t.querySelector('span').innerText = `Загрузка: ${percent}%`;
-            }
-            
-            await NeonDB.saveModel(engine, new Blob(chunks));
             t.remove();
-            this.logToast("ГОЛОС УСТАНОВЛЕН", "ok");
+            this.logToast("VITS УСТАНОВЛЕН И ЗАКЭШИРОВАН", "ok");
+            localStorage.setItem('vits_installed', 'true');
             this.checkModelStatus();
-               } catch(e) {
+        } catch(e) {
             t.remove();
-            this.logToast("Сбой: " + e.message, "error");
+            this.logToast("Сбой загрузки: " + e.message, "error");
         }
-
     },
 
-
-    async playOfflineModel(text, engine) {
+    // ГЕНЕРАЦИЯ ЗВУКА VITS В БРАУЗЕРЕ
+    async playVITSModel(text) {
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.clearToasts();
         
-        let t = this.logToast(`Нейронка думает...`, "ok", 0);
+        let t = this.logToast(`VITS синтезирует...`, "ok", 0);
         
         try {
-            const blob = await NeonDB.getModel(engine);
-            if (!blob) throw new Error("Сначала скачай голос в настройках!");
+            // Если мы обновили страницу, но модель в кэше есть — подгружаем её тихо
+            if (!window.appSynthesizer) {
+                window.appSynthesizer = await window.NeuralTTS.pipeline('text-to-speech', 'Xenova/mms-tts-rus', { quantized: true });
+            }
 
-            const modelBuffer = await blob.arrayBuffer();
-            const session = await ort.InferenceSession.create(modelBuffer, { executionProviders: ['wasm'] });
-
-            const chars = text.toLowerCase().split("");
-            const tokens = chars.map(c => SILERO_TOKENS[c] || 1).filter(Boolean);
+            // Нейронка генерирует звук
+            const out = await window.appSynthesizer(text);
             
-            const inputTensor = new ort.Tensor('int64', BigInt64Array.from(tokens.map(BigInt)), [1, tokens.length]);
-            const srTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(24000)]), []);
-            const speakerTensor = new ort.Tensor('int64', BigInt64Array.from([BigInt(0)]), []); 
-
-            const feeds = { input: inputTensor, sr: srTensor, speaker: speakerTensor };
-            const results = await session.run(feeds);
-            const audioData = results.output.data; 
-
-            const audioBuffer = this.audioCtx.createBuffer(1, audioData.length, 24000);
+            const audioData = out.audio; 
+            const sampleRate = out.sampling_rate;
+            
+            const audioBuffer = this.audioCtx.createBuffer(1, audioData.length, sampleRate);
             audioBuffer.getChannelData(0).set(audioData);
             
             if (this.audioSource) { try { this.audioSource.stop(); } catch(e){} }
@@ -1055,7 +1000,7 @@ const app = {
             this.isPlaying = true; this.updateUI();
         } catch(e) {
             t.remove();
-            this.logToast("Ошибка ИИ: " + e.message, "error");
+            this.logToast("Ошибка VITS: " + e.message, "error");
             this.stop();
         }
     },
@@ -1070,8 +1015,8 @@ const app = {
             this.playGoogle(text);
         } else if (voice === 'alisa') {
             await this.playAlisa(text);
-        } else if (voice === 'silero') {
-            await this.playOfflineModel(text, voice);
+        } else if (voice === 'vits') {
+            await this.playVITSModel(text);
         } else {
             this.clearToasts();
             this.logToast(`Модуль не поддерживается!`, "error");
@@ -1089,7 +1034,6 @@ const app = {
         this.isPlaying = true; this.updateUI();
     },
 
-    // ГИБРИДНЫЙ ВЫЗОВ ЯНДЕКСА (АПК + ВЕБ)
     async playAlisa(text) {
         const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0).toFixed(1);
         const ttsUrl = `https://tts.voicetech.yandex.net/generate?key=${this.yKey}&text=${encodeURIComponent(text)}&format=mp3&lang=ru-RU&speaker=alyss&quality=hi&speed=${speed}`;
@@ -1102,7 +1046,6 @@ const app = {
                 this.audio.playbackRate = parseFloat(speed);
                 await this.audio.play(); 
             } else {
-                // Для веба используем прокси для аудио файла
                 const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(ttsUrl)}`;
                 const res = await fetch(proxyUrl); 
                 if (!res.ok) throw new Error();
@@ -1128,12 +1071,18 @@ const app = {
             this.clearToasts();
             return this.logToast("Сначала загрузи главу!", "error");
         }
-        if (this.isPlaying) { this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; } 
+        if (this.isPlaying) { 
+            if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
+            this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; 
+        } 
         else { this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); }
         this.updateUI();
     },
 
-    stop() { this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; this.updateUI(); },
+    stop() { 
+        if (this.audioSource) try { this.audioSource.stop(); } catch(e){}
+        this.audio.pause(); window.speechSynthesis.cancel(); this.isPlaying = false; this.updateUI(); 
+    },
     jump(delta) { this.play(this.currentIndex + delta); },
     seekProgress(e) { if(!this.sents.length) return; const rect = e.currentTarget.getBoundingClientRect(); this.play(Math.floor(this.sents.length * ((e.clientX - rect.left) / rect.width))); },
 
@@ -1153,7 +1102,7 @@ const app = {
             window.open(this.audio.src); 
         } else {
             this.clearToasts();
-            this.logToast("MP3 недоступен.", "error");
+            this.logToast("MP3 недоступен в оффлайн-режиме.", "error");
         }
     },
     
