@@ -65,6 +65,7 @@
             --theme-rgb: 168, 85, 247;
             --theme-cached-hex: #10b981; 
             --glow-int: 1; 
+            --font-size: 18px;
             
             --glass-panel: rgba(15, 15, 22, 0.75);
             --glass-border: rgba(255, 255, 255, 0.08);
@@ -168,15 +169,14 @@
         #library-room.show { opacity: 1; display: flex; }
         .lib-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top) + 20px) 20px 15px; border-bottom: 1px solid var(--glass-border); background: rgba(0,0,0,0.5); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
         
-        .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; padding: 20px; overflow-y: auto; flex: 1; }
-        .book-card { background: rgba(255,255,255,0.03); border-radius: 20px; position: relative; transition: 0.3s; display: flex; flex-direction: column; height: auto; min-height: 360px; border: 1px solid var(--glass-border); overflow: hidden; }
+        .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; padding: 15px; overflow-y: auto; flex: 1; align-content: start; }
+        .book-card { background: rgba(255,255,255,0.03); border-radius: 20px; position: relative; transition: 0.3s; display: flex; flex-direction: column; height: auto; min-height: 360px; border: 1px solid var(--glass-border); overflow: hidden; max-width: 220px; margin: 0 auto; width: 100%; }
         .book-card.downloading { border-color: var(--theme-hex); box-shadow: 0 0 25px rgba(var(--theme-rgb), 0.4); }
         .book-card.downloaded { border-color: var(--theme-hex); }
         .book-content { display: flex; flex-direction: column; height: 100%; }
         .book-cover { width: 100%; height: 200px; object-fit: cover; background: #000; transition: 0.5s; }
         .book-card:hover .book-cover { transform: scale(1.05); }
-        .download-badge { position: absolute; top: 12px; right: 12px; background: var(--theme-hex); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 900; z-index: 5; box-shadow: 0 0 15px rgba(0,0,0,0.5); display: none; }
-        .book-card.downloading .download-badge { display: block; }
+        .download-badge { position: absolute; top: 12px; right: 12px; background: var(--theme-hex); color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 900; z-index: 5; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
 
         #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 20000; display: none; justify-content: center; align-items: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(10px); }
         #settings-modal.show { opacity: 1; pointer-events: auto; display: flex; }
@@ -191,7 +191,7 @@
         input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
         input[type="range"] { flex: 1; margin-left: 15px; accent-color: var(--theme-hex); }
 
-        main { flex: 1; overflow-y: auto; padding: 10px 15px 180px 15px; line-height: 1.7; font-size: 18px; scroll-behavior: smooth; position: relative; }
+        main { flex: 1; overflow-y: auto; padding: 10px 15px 180px 15px; line-height: 1.7; font-size: var(--font-size); scroll-behavior: smooth; position: relative; }
         main::after { content: ''; position: fixed; bottom: 0; left: 0; right: 0; height: 120px; background: linear-gradient(transparent, var(--bg-base)); pointer-events: none; z-index: 1; }
         
         .paragraph { margin-bottom: 20px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
@@ -287,7 +287,7 @@
         </div>
         <div class="tools">
             <button class="action-btn btn-icon" onclick="document.getElementById('dev-console-modal').style.display='flex'" title="Логи">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
             <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
@@ -345,6 +345,7 @@
                     <option value='"Courier New", monospace'>Monospace</option>
                 </select>
             </div>
+            <div class="setting-row"><span class="setting-label">Размер текста: <b id="font-size-val">18</b>px</span><input type="range" id="cfg-font-size" min="12" max="32" step="1" value="18" oninput="document.getElementById('font-size-val').innerText=this.value" onchange="app.updateSettings()"></div>
             <div class="setting-row"><span class="setting-label">Цвет кэша (Оффлайн слой)</span><input type="color" id="cfg-cached" onchange="app.updateSettings()"></div>
             <div class="setting-row"><span class="setting-label">Сила свечения</span><input type="range" id="cfg-glow" min="0" max="2" step="0.1" onchange="app.updateSettings()"></div>
         </div>
@@ -409,22 +410,21 @@
             <button class="play-btn" id="play-btn" onclick="app.togglePlay()">
                 <svg class="icon-fill" style="width:22px;height:22px;margin-left:3px;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             </button>
-            <button class="icon-btn" onclick="app.nextChapter(true)" title="Следующая глава (Добавить)">
+            <button class="icon-btn" onclick="app.jump(1)">
                 <svg class="icon-fill" style="width:20px;height:20px;" viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
             </button>
         </div>
 
         <div style="display: flex; gap: 5px; align-items: center;">
             <div id="counter" style="font-size: 10px; color: var(--subtext); font-family: monospace; font-weight: bold; width: 30px; text-align: right;">0/0</div>
-            <button class="icon-btn" onclick="app.processChapter(null, false)" title="Обновить с нуля">
-                <svg class="icon-fill" style="width:14px;height:14px; color:var(--text-color);" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.22-10.27l-5.32 5.32"></path></svg>
+            <button class="icon-btn" onclick="app.nextChapter(true)" title="Следующая глава (Добавить)">
+                <svg class="icon-fill" style="width:14px;height:14px; color:var(--text-color);" viewBox="0 0 24 24"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
             </button>
         </div>
     </div>
 </footer>
 
 <script>
-// УБИВАЕМ ЗАСТРЯВШИЙ СЕРВИС-ВОРКЕР
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) { registration.unregister(); }
@@ -436,7 +436,7 @@ const NeonDB = {
     db: null,
     async init() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open("NeonReaderDB", 12);
+            const req = indexedDB.open("NeonReaderDB", 13);
             req.onupgradeneeded = (e) => {
                 this.db = e.target.result;
                 if (!this.db.objectStoreNames.contains("chapters")) {
@@ -610,7 +610,7 @@ const app = {
     },
 
     loadSettings() {
-        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', text: '#f1f5f9', cached: '#10b981', glow: 1, speed: 1.0, autoresume: true, engine: 'quality' };
+        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', fontSize: 18, text: '#f1f5f9', cached: '#10b981', glow: 1, speed: 1.0, autoresume: true, engine: 'quality' };
         document.getElementById('cfg-theme').value = conf.theme || '#a855f7';
         document.getElementById('cfg-bg').value = conf.bg || '#0a0a0f';
         document.getElementById('cfg-text').value = conf.text || '#f1f5f9';
@@ -619,6 +619,10 @@ const app = {
         
         if(document.getElementById('cfg-font')) {
             document.getElementById('cfg-font').value = conf.font || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+        }
+        if(document.getElementById('cfg-font-size')) {
+            document.getElementById('cfg-font-size').value = conf.fontSize || 18;
+            document.getElementById('font-size-val').innerText = conf.fontSize || 18;
         }
         if(document.getElementById('voice-speed')) {
             document.getElementById('voice-speed').value = conf.speed || 1.0;
@@ -639,6 +643,7 @@ const app = {
             bg: document.getElementById('cfg-bg').value,
             text: document.getElementById('cfg-text').value,
             font: document.getElementById('cfg-font') ? document.getElementById('cfg-font').value : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+            fontSize: document.getElementById('cfg-font-size') ? document.getElementById('cfg-font-size').value : 18,
             cached: document.getElementById('cfg-cached') ? document.getElementById('cfg-cached').value : '#10b981',
             glow: document.getElementById('cfg-glow').value,
             speed: document.getElementById('voice-speed') ? document.getElementById('voice-speed').value : 1.0,
@@ -647,7 +652,7 @@ const app = {
         };
         localStorage.setItem('neon_custom_ui', JSON.stringify(conf));
         this.applySettingsUI(conf);
-        if (this.audio) this.audio.playbackRate = parseFloat(conf.speed);
+        this.audioBufferCache = {}; 
     },
 
     applySettingsUI(conf) {
@@ -657,6 +662,7 @@ const app = {
         root.style.setProperty('--bg-base', conf.bg);
         root.style.setProperty('--text-color', conf.text);
         root.style.setProperty('--font', conf.font || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+        root.style.setProperty('--font-size', (conf.fontSize || 18) + 'px');
         root.style.setProperty('--theme-cached-hex', conf.cached || '#10b981');
         root.style.setProperty('--glow-int', conf.glow);
     },
@@ -763,7 +769,7 @@ const app = {
 
     async clearBookCache(id) {
         if(!confirm("Очистить скачанные главы (кэш), но оставить книгу в библиотеке?")) return;
-        await NeonDB.clearCacheByBookId(id);
+        await NeonDB.deleteBookChapters(id);
         let book = this.library.find(b => b.id === id);
         if(book) {
             book.cachedCount = 0;
@@ -859,7 +865,6 @@ const app = {
         let success = false;
         
         const endpoints = [];
-        
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
             endpoints.push({ type: 'native', url: url });
         }
@@ -925,7 +930,6 @@ const app = {
         }
 
         t.remove();
-
         if (!success) {
             console.error("ВСЕ МЕТОДЫ ПРОБИВА ОТВАЛИЛИСЬ.");
             this.logToast(`СБОЙ: Сайт заблокировал все доступы.`, "error", 5000);
@@ -1073,9 +1077,7 @@ const app = {
             this.prevUrl = dbData.prevUrl;
             
             const ruChars = rawText.match(/[а-яА-ЯёЁ]/g);
-            if (ruChars && ruChars.length > rawText.length * 0.1) {
-                isAlreadyTranslated = true;
-            }
+            if (ruChars && ruChars.length > rawText.length * 0.1) isAlreadyTranslated = true;
         } else {
             tDb.remove();
             try {
@@ -1085,7 +1087,6 @@ const app = {
                 this.prevUrl = data.prevUrl;
                 this.currentBookMetadata.title = data.title;
                 this.currentBookMetadata.cover = data.cover;
-                // Сохраняем оригинал
                 await NeonDB.saveChapter(url, this.currentBookId, rawText, data.nextUrl, data.prevUrl);
             } catch (e) { 
                 if (e.message.includes("Требуется обход защиты")) return;
@@ -1103,7 +1104,6 @@ const app = {
             let tTr = this.logToast("Нейроперевод...", "ok", 0);
             try {
                 finalText = await this.translate(rawText);
-                // Перезаписываем перевод
                 await NeonDB.saveChapter(url, this.currentBookId, finalText, this.nextUrl, this.prevUrl);
                 this.render(finalText, isAppend, chapterLabel);
                 tTr.remove();
@@ -1152,9 +1152,7 @@ const app = {
         if(!this.chapterMarkers) this.chapterMarkers = [];
         this.chapterMarkers.push({ index: this.sents.length, title: chapterTitle });
 
-        // Жесткий лимит для Google Premium
         const chunkSize = 200; 
-        
         let cleanedText = text.replace(/\n\s*\n/g, '\n');
         const paragraphs = cleanedText.split('\n');
 
@@ -1171,14 +1169,12 @@ const app = {
             parts.forEach(s => {
                 s = s.trim();
                 if (!s) return;
-                
                 if (currentChunkText.length + s.length > chunkSize && currentChunkText.length > 0) {
                     const gIdx = this.sents.length;
                     const span = document.createElement('span');
                     span.className = 'sentence'; span.id = 's-' + gIdx;
                     span.innerHTML = currentChunkText + " ";
                     span.onclick = () => { this.preloadedIndex = -1; this.play(gIdx); };
-                    
                     this.sents.push(currentChunkText.replace(/<br>/g, ' ').trim());
                     currentDiv.appendChild(span);
                     currentChunkText = ""; 
@@ -1194,7 +1190,6 @@ const app = {
             span.className = 'sentence'; span.id = 's-' + gIdx;
             span.innerHTML = currentChunkText;
             span.onclick = () => { this.preloadedIndex = -1; this.play(gIdx); };
-            
             this.sents.push(currentChunkText.replace(/<br>/g, ' ').trim());
             currentDiv.appendChild(span);
         }
@@ -1205,7 +1200,8 @@ const app = {
     },
 
     getGoogleTTSUrl(text) {
-        return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ru&client=tw-ob`;
+        const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
+        return `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ru&client=tw-ob&ttsspeed=${speed}`;
     },
 
     async getAudioBuffer(text) {
@@ -1216,38 +1212,29 @@ const app = {
             if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
                 const res = await window.Capacitor.Plugins.CapacitorHttp.get({
                     url: ttsUrl,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': '*/*'
-                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*' },
                     responseType: 'arraybuffer'
                 });
                 
                 if (res.status === 200 && res.data) {
                     let base64Str = res.data;
                     if (base64Str.includes(',')) base64Str = base64Str.split(',')[1];
-                    
                     const binaryString = window.atob(base64Str);
                     const bytes = new Uint8Array(binaryString.length);
                     for (let i = 0; i < binaryString.length; i++) {
                         bytes[i] = binaryString.charCodeAt(i);
                     }
                     arrayBuffer = bytes.buffer;
-                } else {
-                    throw new Error("HTTP Status: " + res.status);
-                }
-            } else {
-                throw new Error("Browser Env");
-            }
+                } else throw new Error("HTTP Status: " + res.status);
+            } else throw new Error("Browser Env");
         } catch (e) {
-            console.warn("NATIVE audio fetch failed, trying proxy...", e);
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ttsUrl)}`;
             const res = await fetch(proxyUrl);
             if (!res.ok) throw new Error("Proxy failed");
             arrayBuffer = await res.arrayBuffer();
         }
 
-        if (!arrayBuffer || arrayBuffer.byteLength < 100) throw new Error("Пустой аудио буфер");
+        if (!arrayBuffer || arrayBuffer.byteLength < 100) throw new Error("Empty buffer");
 
         if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         return await this.audioCtx.decodeAudioData(arrayBuffer);
@@ -1265,13 +1252,12 @@ const app = {
         
         if (index >= this.sents.length) {
             if (this.nextUrl && !this.isFetchingNext) {
-                console.log("Достигнут конец. Автоподгрузка следующей главы...");
                 this.isFetchingNext = true;
                 await this.processChapter(this.nextUrl, true);
                 this.isFetchingNext = false;
                 if (index < this.sents.length) this.play(index);
                 else this.stop();
-            } else { this.stop(); }
+            } else this.stop();
             return;
         }
 
@@ -1290,18 +1276,16 @@ const app = {
         
         const voice = document.getElementById('voice-engine-select').value;
         const text = this.sents[index];
-        const speed = parseFloat(document.getElementById('voice-speed')?.value || 1.0);
         const ttsUrl = this.getGoogleTTSUrl(text);
         
         if (voice === 'quality') { 
             try {
                 const buffer = await this.preloadAudio(text);
-                
                 if (!this.audioCtx) this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 
                 const source = this.audioCtx.createBufferSource();
                 source.buffer = buffer;
-                source.playbackRate.value = speed; 
+                source.playbackRate.value = 1.0; // СКОРОСТЬ ВШИТА В БУФЕР
                 source.connect(this.audioCtx.destination);
                 
                 const currentTime = this.audioCtx.currentTime;
@@ -1312,9 +1296,7 @@ const app = {
                 source.start(this.nextStartTime);
                 this.currentBufferSource = source;
                 
-                const duration = buffer.duration / speed;
-                this.nextStartTime += duration;
-                
+                this.nextStartTime += buffer.duration;
                 this.isPlaying = true;
                 
                 source.onended = () => {
@@ -1325,37 +1307,11 @@ const app = {
                 if (index + 2 < this.sents.length) this.preloadAudio(this.sents[index + 2]).catch(()=>{});
 
             } catch (e) {
-                console.warn("Сшиватель отвалился (CORS/Декод). Включаю гибридный классический режим...", e);
-                
-                if (this.preloadedIndex === index && this.preloadedAudio.src) {
-                    this.audio.src = this.preloadedAudio.src;
-                } else {
-                    this.audio.src = ttsUrl;
-                }
-                this.audio.playbackRate = speed;
-                this.audio.play().catch(err => {
-                    console.error("Критический сбой аудио:", err);
-                    if (!this.isPlaying) return;
-                    const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || {};
-                    if (conf.autoresume !== false) {
-                        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-                        this.reconnectTimer = setTimeout(() => {
-                            if (this.isPlaying) this.play(this.currentIndex);
-                        }, 3000);
-                    } else {
-                        this.stop();
-                    }
-                });
+                console.warn("Гибридный режим...", e);
+                this.audio.src = ttsUrl;
+                this.audio.play().catch(()=>{});
                 this.isPlaying = true;
-
-                if (index + 1 < this.sents.length) {
-                    this.preloadedIndex = index + 1;
-                    this.preloadedAudio.src = this.getGoogleTTSUrl(this.sents[index + 1]);
-                }
-                
-                this.audio.onended = () => {
-                    if (this.isPlaying && this.currentIndex === index) this.jump(1);
-                };
+                this.audio.onended = () => { if (this.isPlaying && this.currentIndex === index) this.jump(1); };
             }
         } else { 
             if (this.currentBufferSource) {
@@ -1366,28 +1322,20 @@ const app = {
                 window.speechSynthesis.cancel();
                 const utt = new SpeechSynthesisUtterance(text); 
                 utt.lang = 'ru-RU';
-                utt.rate = speed;
+                utt.rate = parseFloat(document.getElementById('voice-speed').value);
                 if (this.voices.length > 0) {
-                    utt.voice = this.voices.find(v => v.name.includes('Google') || v.lang.includes('ru')) || this.voices[0];
+                    utt.voice = this.voices.find(v => v.lang.includes('ru')) || this.voices[0];
                 }
                 utt.onend = () => { if (this.isPlaying) this.jump(1); };
                 window.speechSynthesis.speak(utt);
                 this.isPlaying = true;
-            } else {
-                console.error("SpeechSynthesis недоступен.");
-                this.logToast("Оффлайн TTS отключен в системе", "error");
-                this.stop();
             }
         }
     },
 
     togglePlay() {
-        if (!this.sents.length) {
-            this.clearToasts();
-            return this.logToast("Сначала загрузи главу!", "error");
-        }
+        if (!this.sents.length) return this.logToast("Загрузи главу!", "error");
         if (this.isPlaying) { 
-            console.log("Кнопка: Пауза");
             if(this.reconnectTimer) clearTimeout(this.reconnectTimer);
             if(this.currentBufferSource) {
                 this.currentBufferSource.onended = null;
@@ -1399,8 +1347,6 @@ const app = {
             this.isPlaying = false; 
         } 
         else { 
-            console.log("Кнопка: Плей");
-            this.preloadedIndex = -1;
             this.nextStartTime = 0; 
             this.currentIndex === -1 ? this.play(0) : this.play(this.currentIndex); 
         }
@@ -1408,7 +1354,6 @@ const app = {
     },
 
     stop() { 
-        console.log("Полная остановка.");
         if(this.reconnectTimer) clearTimeout(this.reconnectTimer);
         if(this.currentBufferSource) {
             this.currentBufferSource.onended = null;
@@ -1422,7 +1367,6 @@ const app = {
     },
 
     jump(delta) { 
-        this.preloadedIndex = -1; 
         this.nextStartTime = 0;
         if (this.currentBufferSource) {
             this.currentBufferSource.onended = null;
@@ -1434,7 +1378,6 @@ const app = {
     seekProgress(e) { 
         if(!this.sents.length) return; 
         const rect = e.currentTarget.getBoundingClientRect(); 
-        this.preloadedIndex = -1;
         this.nextStartTime = 0;
         if (this.currentBufferSource) {
             this.currentBufferSource.onended = null;
@@ -1444,43 +1387,24 @@ const app = {
     },
 
     saveBookmark() {
-        if (this.currentIndex === -1) {
-            this.clearToasts();
-            return this.logToast("Нечего сохранять!", "error");
-        }
+        if (this.currentIndex === -1) return this.logToast("Нечего сохранять!", "error");
         let cUrl = document.getElementById('url-input').value;
-        for (let i = this.chapterMarkers.length - 1; i >= 0; i--) {
-            if (this.currentIndex >= this.chapterMarkers[i].index) break;
-        }
         const data = { url: cUrl, index: this.currentIndex };
         localStorage.setItem('neon_pro_save', JSON.stringify(data));
-        this.clearToasts();
         this.logToast("Закладка сохранена!", "ok");
     },
     
     downloadMp3() { 
-        if (this.currentIndex !== -1 && this.sents.length > 0) {
-            const engine = document.getElementById('voice-engine-select').value;
-            if(engine === 'quality') {
-                window.open(this.getGoogleTTSUrl(this.sents[this.currentIndex]));
-            } else {
-                 this.logToast("MP3 доступен только для Онлайн режима.", "error");
-            }
-        } else {
-            this.clearToasts();
-            this.logToast("Нет данных для скачивания.", "error");
+        if (this.currentIndex !== -1) {
+            window.open(this.getGoogleTTSUrl(this.sents[this.currentIndex]));
         }
     },
     
     nextChapter(forceAppend = false) { 
-        console.log("Переход на следующую главу.");
         if (this.nextUrl && !this.isFetchingNext) { 
             this.isFetchingNext = true;
             this.processChapter(this.nextUrl, forceAppend).then(() => this.isFetchingNext = false);
-        } else {
-            this.clearToasts();
-            this.logToast("Ссылка не найдена.", "error");
-        }
+        } else this.logToast("Конец книги", "error");
     },
 
     updateUI() {
@@ -1497,9 +1421,6 @@ const app = {
             document.getElementById('counter').innerText = `${this.currentIndex + 1}/${this.sents.length}`;
             
             let cUrl = document.getElementById('url-input').value;
-            for (let i = this.chapterMarkers.length - 1; i >= 0; i--) {
-                if (this.currentIndex >= this.chapterMarkers[i].index) break;
-            }
             localStorage.setItem('neon_pro_save', JSON.stringify({ url: cUrl, index: this.currentIndex }));
         }
     },
@@ -1507,38 +1428,23 @@ const app = {
     updateVisualizers() {
         const container = document.querySelector('.progress-container');
         if (!container) return;
-        
-        const cachedBar = document.getElementById('progress-cached');
-        if(cachedBar) cachedBar.style.width = "100%"; 
-        
+        document.getElementById('progress-cached').style.width = "100%"; 
         container.querySelectorAll('.chapter-marker').forEach(m => m.remove());
         if (!this.chapterMarkers || this.sents.length === 0) return;
-        
         this.chapterMarkers.forEach(marker => {
             if (marker.index === 0) return; 
             const pct = (marker.index / this.sents.length) * 100;
             const mDiv = document.createElement('div');
             mDiv.className = 'chapter-marker';
-            mDiv.style.position = 'absolute';
             mDiv.style.left = pct + '%';
-            mDiv.style.top = '0';
-            mDiv.style.width = '2px';
-            mDiv.style.height = '100%';
-            mDiv.style.backgroundColor = '#fff';
-            mDiv.style.opacity = '0.8';
-            mDiv.style.zIndex = '5';
-            mDiv.title = marker.title;
             container.appendChild(mDiv);
         });
     }
 };
 
 window.onload = async () => {
-    const list = document.getElementById('dev-console-list');
     window.appLogs.forEach(l => printToDevConsole(l.msg, l.color));
     window.appLogs = [];
-    
-    console.log("=== ИНИЦИАЛИЗАЦИЯ NEON READER ===");
     await app.init();
 };
 </script>
