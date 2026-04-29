@@ -793,110 +793,83 @@ const app = {
         let html = "";
         let success = false;
         
-        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins);
-        const hasHttpPlugin = !!(window.Capacitor && window.Capacitor.Plugins.CapacitorHttp);
+        // Собираем цепочку методов пробива сайта
+        const endpoints = [];
+        
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
+            endpoints.push({ type: 'native', url: url });
+        }
+        // Прокси идут следом как запасной план для АПК, и как основной для Веба
+        endpoints.push({ type: 'proxy', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` });
+        endpoints.push({ type: 'proxy', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` });
 
-        try {
-            if (isAPK) {
-                if (!hasHttpPlugin) {
-                    throw new Error("АПК: Плагин CapacitorHttp НЕ ВШИТ! Проверь сборку.");
-                }
-
-                t.querySelector('span').innerText = `АПК: Запрос к сайту...`;
-                console.log("АПК: Начинаем нативный HTTP запрос");
+        for (let ep of endpoints) {
+            try {
+                console.log(`Пробуем метод: [${ep.type}] -> ${ep.url.substring(0, 60)}...`);
+                t.querySelector('span').innerText = `Метод: ${ep.type.toUpperCase()}...`;
                 
-                try {
+                let text = "";
+                let status = 0;
+
+                if (ep.type === 'native') {
                     const options = {
-                        url: url,
+                        url: ep.url,
                         headers: {
-                            'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'en-US,en;q=0.9,ru;q=0.8'
                         }
                     };
-                    
                     const res = await window.Capacitor.Plugins.CapacitorHttp.get(options);
-                    
-                    t.querySelector('span').innerText = `АПК: Ответ HTTP ${res.status}`;
-                    console.log(`АПК: Ответ получен, статус: ${res.status}`);
-                    
-                    if (res.status !== 200 && res.status !== 201) {
-                        throw new Error(`Сервер вернул статус ${res.status}`);
-                    }
-
-                    html = res.data;
-                    
-                    if (typeof html !== 'string') {
-                        console.warn("Данные пришли как JSON/объект, сериализуем...");
-                        html = JSON.stringify(html);
-                    }
-
-                    if (html && html.length > 500) {
-                        success = true;
-                        console.log(`АПК: Успех, скачано ${html.length} байт`);
-                    } else {
-                        throw new Error(`Пришел пустой или короткий ответ (${html ? html.length : 0} байт)`);
-                    }
-
-                } catch (apkErr) {
-                    console.error("NATIVE ERROR:", apkErr);
-                    throw new Error(`NATIVE: ${apkErr.message || JSON.stringify(apkErr)}`);
+                    status = res.status;
+                    text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || "");
+                } else {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000);
+                    const res = await fetch(ep.url, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+                    status = res.status;
+                    text = await res.text();
                 }
 
-            } else {
-                t.querySelector('span').innerText = `ВЕБ: Проксируем запрос...`;
-                console.log("ВЕБ: Используем прокси-запросы...");
-                const endpoints = [
-                    url, 
-                    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-                    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-                ];
+                console.log(`[${ep.type}] Ответ сервера. Статус: ${status}, Длина: ${text ? text.length : 0}`);
 
-                for (let ep of endpoints) {
-                    try {
-                        console.log(`Попытка эндпоинта: ${ep}`);
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 8000);
-                        
-                        const res = await fetch(ep, { signal: controller.signal });
-                        clearTimeout(timeoutId);
-                        
-                        let text = await res.text();
-                        console.log(`Ответ от прокси: статус ${res.status}, длина ${text.length}`);
-                            
-                        if (text.trim().startsWith('{') && text.includes('"contents"')) {
-                            try { text = JSON.parse(text).contents; } catch(e){}
-                        }
-
-                        if (text.includes('<title>Just a moment...</title>') || text.includes('id="challenge-running"')) {
-                            t.remove();
-                            console.warn("Поймали Cloudflare Captcha!");
-                            this.openCaptchaModal(url);
-                            throw new Error("BLOCK_CLOUDFLARE");
-                        }
-
-                        if (res.ok && text.length > 500) {
-                            html = text;
-                            success = true;
-                            break;
-                        }
-                    } catch(e) {
-                        if (e.message === "BLOCK_CLOUDFLARE") throw e;
-                        console.warn("Эндпоинт отвалился:", e.message);
-                    }
+                if (ep.type === 'proxy' && text.trim().startsWith('{') && text.includes('"contents"')) {
+                    try { text = JSON.parse(text).contents; } catch(e){}
                 }
+
+                if (text.includes('<title>Just a moment...</title>') || text.includes('id="challenge-running"')) {
+                    console.warn(`[${ep.type}] Блок от Cloudflare Captcha!`);
+                    if (ep === endpoints[endpoints.length - 1]) {
+                        t.remove();
+                        this.openCaptchaModal(url);
+                        throw new Error("BLOCK_CLOUDFLARE");
+                    }
+                    continue; // Пробуем следующий эндпоинт
+                }
+
+                // Считаем успехом, если текста много и это не системная заглушка 301/403
+                if (text && text.length > 500 && !text.includes('301 Moved Permanently')) {
+                    html = text;
+                    success = true;
+                    console.log(`✅ Метод [${ep.type}] успешно скачал данные!`);
+                    break;
+                } else {
+                    console.warn(`[${ep.type}] Ошибка: текст слишком короткий или сервер вернул пустой статус ${status}`);
+                }
+
+            } catch (err) {
+                if (err.message === "BLOCK_CLOUDFLARE") throw err;
+                console.warn(`[${ep.type}] Сбой метода: ${err.message || "Таймаут/Нет сети"}`);
             }
-        } catch (e) {
-            if (e.message === "BLOCK_CLOUDFLARE") throw e;
-            t.remove();
-            console.error("ФАТАЛЬНЫЙ СБОЙ ЗАГРУЗКИ:", e);
-            this.logToast(`СБОЙ: ${e.message}`, "error", 10000);
-            throw e;
         }
 
         t.remove();
+
         if (!success) {
-            console.error("Таймаут или все прокси отвалились");
-            throw new Error("Сбой: Таймаут или сайт не ответил.");
+            console.error("ВСЕ МЕТОДЫ ПРОБИВА ОТВАЛИЛИСЬ.");
+            this.logToast(`СБОЙ: Сайт заблокировал все доступы.`, "error", 5000);
+            throw new Error("Все методы загрузки не сработали.");
         }
 
         this.logToast(`Парсинг DOM...`, 'ok', 500);
