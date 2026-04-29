@@ -689,18 +689,57 @@ const app = {
 
     async networkFetchCore(url, site) {
         this.clearToasts(); 
-        let t = this.logToast(`Загрузка главы...`, 'ok', 0);
+        let t = this.logToast(`Инициализация загрузки...`, 'ok', 0);
+        
         let html = "";
         let success = false;
         
-        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp);
+        const isAPK = !!(window.Capacitor && window.Capacitor.Plugins);
+        const hasHttpPlugin = !!(window.Capacitor && window.Capacitor.Plugins.CapacitorHttp);
 
         try {
             if (isAPK) {
-                const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url: url });
-                html = res.data;
-                if (html && html.length > 500) success = true;
+                if (!hasHttpPlugin) {
+                    throw new Error("АПК: Плагин CapacitorHttp НЕ ВШИТ! Проверь сборку.");
+                }
+
+                t.querySelector('span').innerText = `АПК: Запрос к сайту...`;
+                
+                try {
+                    const options = {
+                        url: url,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                        }
+                    };
+                    
+                    const res = await window.Capacitor.Plugins.CapacitorHttp.get(options);
+                    
+                    t.querySelector('span').innerText = `АПК: Ответ HTTP ${res.status}`;
+                    
+                    if (res.status !== 200 && res.status !== 201) {
+                        throw new Error(`Сервер вернул статус ${res.status}`);
+                    }
+
+                    html = res.data;
+                    
+                    if (typeof html !== 'string') {
+                        html = JSON.stringify(html);
+                    }
+
+                    if (html && html.length > 500) {
+                        success = true;
+                    } else {
+                        throw new Error(`Пришел пустой или короткий ответ (${html ? html.length : 0} байт)`);
+                    }
+
+                } catch (apkErr) {
+                    throw new Error(`NATIVE: ${apkErr.message || JSON.stringify(apkErr)}`);
+                }
+
             } else {
+                t.querySelector('span').innerText = `ВЕБ: Проксируем запрос...`;
                 const endpoints = [
                     url, 
                     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
@@ -739,10 +778,15 @@ const app = {
             }
         } catch (e) {
             if (e.message === "BLOCK_CLOUDFLARE") throw e;
+            t.remove();
+            this.logToast(`СБОЙ: ${e.message}`, "error", 10000);
+            throw e;
         }
 
         t.remove();
-        if (!success) throw new Error("Сбой: Таймаут или сайт не отвечает.");
+        if (!success) throw new Error("Сбой: Таймаут или сайт не ответил.");
+
+        this.logToast(`Парсинг DOM...`, 'ok', 500);
 
         const doc = new DOMParser().parseFromString(html, 'text/html');
         let sel = 'p';
@@ -751,9 +795,13 @@ const app = {
         else if (site === 'lightnovelpub') sel = '#chapter-container p, .chapter-content p';
         else sel = 'p, div.text, div.content, .chapter-content p'; 
 
-        let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(t => t.length > 20);
-        if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(t => t.length > 30);
-        if (paras.length === 0) throw new Error("Текст не найден.");
+        let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(text => text.length > 20);
+        if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(text => text.length > 30);
+        
+        if (paras.length === 0) {
+            this.logToast("СБОЙ: Текст не найден в разметке сайта.", "error", 10000);
+            throw new Error("Текст не найден.");
+        }
 
         let nUrl = null;
         Array.from(doc.querySelectorAll('a')).forEach(a => {
