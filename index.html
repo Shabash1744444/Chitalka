@@ -525,7 +525,11 @@ const app = {
             }
         }
 
-        this.players.forEach(p => {
+        this.players.forEach((p, idx) => {
+            p.id = 'neon-player-' + idx;
+            p.style.display = 'none';
+            document.body.appendChild(p); // Вшиваем плееры физически, чтобы Android их не убил
+            
             p.preservesPitch = true;
             p.webkitPreservesPitch = true;
             p.mozPreservesPitch = true;
@@ -1433,8 +1437,12 @@ const app = {
 
     togglePlay() {
         if (!this.sents.length) return this.logToast("Сначала загрузи главу!", "error");
-        if (this.isPlaying) this.stop();
-        else this.play(this.currentIndex === -1 ? 0 : this.currentIndex);
+        if (this.isPlaying) {
+            this.stop();
+        } else {
+            this.players.forEach(p => p.load());
+            this.play(this.currentIndex === -1 ? 0 : this.currentIndex);
+        }
         this.updateUI();
     },
 
