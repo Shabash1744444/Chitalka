@@ -266,6 +266,33 @@
     </div>
 </div>
 
+<div id="export-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 99999; flex-direction: column; padding: calc(env(safe-area-inset-top) + 20px) 15px 20px 15px; backdrop-filter: blur(15px); justify-content: center;">
+    <div style="background:rgba(0,0,0,0.8); border:1px solid var(--theme-hex); border-radius:12px; padding:20px; box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.2), 0 10px 30px rgba(0,0,0,0.9);">
+        <div style="color:var(--theme-hex); font-size: 18px; font-weight:bold; margin-bottom: 20px; text-align: center; text-shadow: 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.5);">💾 МАСТЕР ЭКСПОРТА</div>
+        
+        <div style="text-align: left; margin-bottom: 15px;">
+            <label style="font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase;">Формат файла:</label>
+            <select id="export-format" class="custom-input" style="width: 100%; margin-top: 5px; font-weight: bold;">
+                <option value="fb2">FB2 (С обложкой и разметкой)</option>
+                <option value="txt">TXT (Чистый текст)</option>
+            </select>
+        </div>
+
+        <div style="text-align: left; margin-bottom: 25px;">
+            <label style="font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase;">Форматирование текста:</label>
+            <select id="export-style" class="custom-input" style="width: 100%; margin-top: 5px; font-weight: bold;">
+                <option value="paragraphs">Оставить абзацы (Стандарт)</option>
+                <option value="solid">Сплошной текст (Удалить пустые строки)</option>
+            </select>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button class="action-btn" style="flex: 1; border-color: var(--danger); color: var(--danger);" onclick="app.closeExportModal()">ОТМЕНА</button>
+            <button class="action-btn btn-main" style="flex: 2; border-color: var(--success); color: var(--success); box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);" onclick="app.executeExport()">СОХРАНИТЬ ФАЙЛ</button>
+        </div>
+    </div>
+</div>
+
 <div id="library-room">
     <div class="lib-header">
         <h2 style="font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px;">
@@ -511,6 +538,7 @@ const app = {
     currentBookMetadata: { title: '', cover: '' },
     activeDownloads: {},
     captchaPendingUrl: null,
+    exportBookId: null,
 
     async init() {
         console.log("Шаг 1: Инициализация БД...");
@@ -780,11 +808,32 @@ const app = {
         this.logToast("Кэш очищен", "ok");
     },
 
-    async exportToFB2(id) {
+    openExportModal(id) {
+        this.exportBookId = id;
+        document.getElementById('export-modal').style.display = 'flex';
+    },
+
+    closeExportModal() {
+        this.exportBookId = null;
+        document.getElementById('export-modal').style.display = 'none';
+    },
+
+    escapeXML(str) {
+        return str.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    },
+
+        async executeExport() {
+        const id = this.exportBookId;
+        if (!id) return;
+        this.closeExportModal();
+
+        const format = document.getElementById('export-format').value; 
+        const style = document.getElementById('export-style').value; 
+
         const book = this.library.find(b => b.id === id);
         if (!book) return;
         
-        let t = this.logToast("Сборка книги FB2...", "ok", 0);
+        let t = this.logToast("Подготовка к экспорту...", "ok", 0);
         const chapters = await NeonDB.getBookChapters(id);
         
         if (!chapters || chapters.length === 0) {
@@ -792,8 +841,21 @@ const app = {
             return this.logToast("Сначала скачайте главы!", "error");
         }
 
+        // 1. Ищем абсолютное начало сохраненного куска (отматываем цепочку назад)
+        let firstChap = chapters.find(c => c.url === book.url);
+        if (firstChap) {
+            while (firstChap.prevUrl) {
+                let prev = chapters.find(c => c.url === firstChap.prevUrl);
+                if (prev) firstChap = prev;
+                else break;
+            }
+        } else if (chapters.length > 0) {
+            firstChap = chapters[0]; 
+        }
+
+        // 2. Выстраиваем правильную последовательность
         let ordered = [];
-        let currentUrl = book.url;
+        let currentUrl = firstChap ? firstChap.url : null;
         while(currentUrl) {
             let ch = chapters.find(c => c.url === currentUrl);
             if(!ch) break;
@@ -802,8 +864,28 @@ const app = {
         }
         if (ordered.length === 0) ordered = chapters;
 
+        // ===== УМНЫЙ ПАРСЕР НОМЕРОВ ГЛАВ ИЗ ССЫЛОК (РЕШЕНИЕ ТВОЕЙ ПРОБЛЕМЫ) =====
+        let lastNum = 0;
+        let isFirstNum = true;
+        ordered.forEach(ch => {
+            // Ищем в ссылке слова chapter, ch, c, glava + цифры (включая дробные, типа 178.5)
+            let match = ch.url.match(/(?:chapter|ch|c|glava|gl|v\d+c)[-_\s]*(\d+(?:\.\d+)?)/i);
+            if (!match) match = ch.url.match(/[-_](\d+)(?:\.html|\/|)$/i); // Резервный поиск числа перед .html
+            
+            if (match) {
+                ch.displayNumber = match[1];
+                lastNum = parseFloat(match[1]);
+            } else {
+                // Если номера в ссылке нет, просто делаем +1 от прошлой главы
+                ch.displayNumber = isFirstNum ? 1 : Math.floor(lastNum) + 1;
+                lastNum = ch.displayNumber;
+            }
+            isFirstNum = false;
+        });
+        // =========================================================================
+
         let coverBase64 = "";
-        if (book.coverUrl) {
+        if (format === 'fb2' && book.coverUrl) {
             try {
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
                     const res = await window.Capacitor.Plugins.CapacitorHttp.get({
@@ -823,78 +905,144 @@ const app = {
                     });
                 }
             } catch (e) {
-                console.warn("Не удалось скачать обложку для FB2", e);
+                console.warn("Не удалось скачать обложку", e);
             }
         }
 
-        let fb2 = `<?xml version="1.0" encoding="utf-8"?>
-<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
-<description>
-    <title-info>
-        <book-title>${book.title.replace(/[&<>'"]/g, '')}</book-title>
-        <author><first-name>NeonReader</first-name><last-name>PRO</last-name></author>
-        ${coverBase64 ? `<coverpage><image l:href="#cover.jpg"/></coverpage>` : ''}
-    </title-info>
-    <document-info>
-        <program-used>NeonReader</program-used>
-        <date>${new Date().toLocaleDateString('ru-RU')}</date>
-        <id>${book.id}</id>
-        <version>1.0</version>
-    </document-info>
-</description>
-<body>
-    <title><p>${book.title.replace(/[&<>'"]/g, '')}</p></title>
-`;
+        const fileName = `${book.title.replace(/[^a-zа-я0-9]/gi, '_')}.${format}`;
+        const isNative = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem);
 
-        ordered.forEach((ch, i) => {
-            fb2 += `\n<section>\n<title><p>Глава ${i + 1}</p></title>\n`;
-            let paragraphs = ch.text.split('\n').filter(p => p.trim());
-            paragraphs.forEach(p => {
-                let safeText = p.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                fb2 += `<p>${safeText}</p>\n`;
-            });
-            fb2 += `</section>\n`;
-        });
-
-        fb2 += `</body>\n`;
-
-        if (coverBase64) {
-            fb2 += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`;
-        }
+        let header = "";
+        let footer = "";
         
-        fb2 += `</FictionBook>`;
+        if (format === 'fb2') {
+            header = `<?xml version="1.0" encoding="utf-8"?>\n<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">\n<description>\n    <title-info>\n        <book-title>${this.escapeXML(book.title)}</book-title>\n        <author><first-name>NeonReader</first-name><last-name>PRO</last-name></author>\n        ${coverBase64 ? `<coverpage><image l:href="#cover.jpg"/></coverpage>` : ''}\n    </title-info>\n    <document-info>\n        <program-used>NeonReader</program-used>\n        <date>${new Date().toLocaleDateString('ru-RU')}</date>\n        <id>${book.id}</id>\n        <version>1.0</version>\n    </document-info>\n</description>\n<body>\n    <title><p>${this.escapeXML(book.title)}</p></title>\n`;
+            footer = `</body>\n`;
+            if (coverBase64) {
+                footer += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`;
+            }
+            footer += `</FictionBook>`;
+        } else {
+            header = `${book.title}\n=======================\n\n`;
+            footer = `\n\n--- Конец ---`;
+        }
 
-        const fileName = `${book.title.replace(/[^a-zа-я0-9]/gi, '_')}.fb2`;
+        try {
+            if (isNative) {
+                const writeB64 = async (str, append) => {
+                    const b64Data = window.btoa(unescape(encodeURIComponent(str)));
+                    if (append) {
+                        await window.Capacitor.Plugins.Filesystem.appendFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' });
+                    } else {
+                        await window.Capacitor.Plugins.Filesystem.writeFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' });
+                    }
+                };
+                
+                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Создание файла...`;
+                await writeB64(header, false);
 
-        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-            try {
-                const b64Data = window.btoa(unescape(encodeURIComponent(fb2)));
-                await window.Capacitor.Plugins.Filesystem.writeFile({
-                    path: fileName,
-                    data: b64Data,
-                    directory: 'DOCUMENTS'
-                });
+                for (let i = 0; i < ordered.length; i++) {
+                    if(i % 5 === 0) {
+                        if(t && t.querySelector('span')) t.querySelector('span').innerText = `Сохранение: ${i + 1} / ${ordered.length} глав...`;
+                    }
+                    
+                    let ch = ordered[i];
+                    let chunk = "";
+                    let textToProcess = ch.text;
+                    
+                    if (style === 'solid') {
+                        textToProcess = textToProcess.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
+                    }
+
+                    if (format === 'fb2') {
+                        // ВСТАВЛЯЕМ УМНЫЙ НОМЕР
+                        chunk += `\n<section>\n<title><p>Глава ${ch.displayNumber}</p></title>\n`;
+                        if (style === 'solid') {
+                            chunk += `<p>${this.escapeXML(textToProcess)}</p>\n`;
+                        } else {
+                            let paras = textToProcess.split('\n').filter(p => p.trim());
+                            paras.forEach(p => { chunk += `<p>${this.escapeXML(p)}</p>\n`; });
+                        }
+                        chunk += `</section>\n`;
+                    } else {
+                        // ВСТАВЛЯЕМ УМНЫЙ НОМЕР
+                        chunk += `\n\n--- Глава ${ch.displayNumber} ---\n\n`;
+                        if (style === 'solid') {
+                            chunk += textToProcess + "\n";
+                        } else {
+                            chunk += textToProcess.split('\n').filter(p => p.trim()).join('\n\n') + "\n";
+                        }
+                    }
+                    
+                    await writeB64(chunk, true);
+                    if(i % 10 === 0) await new Promise(r => setTimeout(r, 50)); 
+                }
+
+                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Завершение файла...`;
+                await writeB64(footer, true);
+
                 t.remove();
-                this.logToast(`Сохранено в Документы: ${fileName}`, "ok", 4000);
-                return;
-            } catch (e) {
-                console.warn("Filesystem write error, falling back to blob", e);
-            }
-        }
+                this.logToast(`Успешно сохранено: ${fileName}`, "ok", 5000);
 
-        const blob = new Blob([fb2], { type: "application/xml;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        t.remove();
-        this.logToast("Книга FB2 сохранена!", "ok");
+            } else {
+                let fileParts = [header];
+                for (let i = 0; i < ordered.length; i++) {
+                    if(i % 10 === 0) {
+                        if(t && t.querySelector('span')) t.querySelector('span').innerText = `Сборка: ${i + 1} / ${ordered.length} глав...`;
+                        await new Promise(r => setTimeout(r, 10)); 
+                    }
+                    
+                    let ch = ordered[i];
+                    let chunk = "";
+                    let textToProcess = ch.text;
+                    
+                    if (style === 'solid') {
+                        textToProcess = textToProcess.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
+                    }
+
+                    if (format === 'fb2') {
+                        chunk += `\n<section>\n<title><p>Глава ${ch.displayNumber}</p></title>\n`;
+                        if (style === 'solid') {
+                            chunk += `<p>${this.escapeXML(textToProcess)}</p>\n`;
+                        } else {
+                            let paras = textToProcess.split('\n').filter(p => p.trim());
+                            paras.forEach(p => { chunk += `<p>${this.escapeXML(p)}</p>\n`; });
+                        }
+                        chunk += `</section>\n`;
+                    } else {
+                        chunk += `\n\n--- Глава ${ch.displayNumber} ---\n\n`;
+                        if (style === 'solid') {
+                            chunk += textToProcess + "\n";
+                        } else {
+                            chunk += textToProcess.split('\n').filter(p => p.trim()).join('\n\n') + "\n";
+                        }
+                    }
+                    fileParts.push(chunk);
+                }
+                fileParts.push(footer);
+
+                const mimeType = format === 'fb2' ? "application/xml;charset=utf-8" : "text/plain;charset=utf-8";
+                const blob = new Blob(fileParts, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                t.remove();
+                this.logToast(`Файл скачан: ${fileName}`, "ok");
+            }
+
+        } catch (e) {
+            console.error("Export Error:", e);
+            t.remove();
+            this.logToast("Сбой при сохранении: " + e.message, "error", 5000);
+        }
     },
+
 
     renderLibraryGrid() {
         const grid = document.getElementById('library-grid');
@@ -923,7 +1071,7 @@ const app = {
                         </div>
                         <div style="display:flex; justify-content:space-between; margin-top:8px;">
                             <button class="action-btn" style="color:#f59e0b; border:none; padding:4px;" onclick="app.clearBookCache('${book.id}')" title="Очистить кэш">🧹 КЭШ</button>
-                            <button class="action-btn" style="color:#10b981; border:none; padding:4px;" onclick="app.exportToFB2('${book.id}')" title="Скачать в FB2">💾 FB2</button>
+                            <button class="action-btn" style="color:#10b981; border:none; padding:4px;" onclick="app.openExportModal('${book.id}')" title="Экспорт книги">💾 ЭКСПОРТ</button>
                             <button class="action-btn" style="color:var(--danger); border:none; padding:4px;" onclick="app.deleteEntireBook('${book.id}')" title="Удалить">🗑️</button>
                         </div>
                     </div>
