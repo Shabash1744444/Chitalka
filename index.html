@@ -287,7 +287,7 @@
         </div>
         <div class="tools">
             <button class="action-btn btn-icon" onclick="document.getElementById('dev-console-modal').style.display='flex'" title="Логи">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
             <button class="action-btn btn-icon" onclick="app.toggleLibrary()" title="Библиотека">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
@@ -481,6 +481,22 @@ const NeonDB = {
     },
     async clearCacheByBookId(bookId) {
         return this.deleteBookChapters(bookId);
+    },
+    async getBookChapters(bookId) {
+        return new Promise((resolve) => {
+            const tx = this.db.transaction("chapters", "readonly");
+            const store = tx.objectStore("chapters");
+            const req = store.openCursor();
+            let results = [];
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    if (cursor.value.bookId === bookId) results.push(cursor.value);
+                    cursor.continue();
+                } else resolve(results);
+            };
+            req.onerror = () => resolve([]);
+        });
     }
 };
 
@@ -513,6 +529,7 @@ const app = {
             p.preservesPitch = true;
             p.webkitPreservesPitch = true;
             p.mozPreservesPitch = true;
+            p.onended = () => { if(this.isPlaying) this.jump(1); };
             p.onerror = () => {
                 if (!this.isPlaying) return;
                 if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -759,6 +776,122 @@ const app = {
         this.logToast("Кэш очищен", "ok");
     },
 
+    async exportToFB2(id) {
+        const book = this.library.find(b => b.id === id);
+        if (!book) return;
+        
+        let t = this.logToast("Сборка книги FB2...", "ok", 0);
+        const chapters = await NeonDB.getBookChapters(id);
+        
+        if (!chapters || chapters.length === 0) {
+            t.remove();
+            return this.logToast("Сначала скачайте главы!", "error");
+        }
+
+        let ordered = [];
+        let currentUrl = book.url;
+        while(currentUrl) {
+            let ch = chapters.find(c => c.url === currentUrl);
+            if(!ch) break;
+            ordered.push(ch);
+            currentUrl = ch.nextUrl;
+        }
+        if (ordered.length === 0) ordered = chapters;
+
+        let coverBase64 = "";
+        if (book.coverUrl) {
+            try {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
+                    const res = await window.Capacitor.Plugins.CapacitorHttp.get({
+                        url: book.coverUrl,
+                        responseType: 'base64'
+                    });
+                    coverBase64 = res.data;
+                    if (coverBase64.includes(',')) coverBase64 = coverBase64.split(',')[1];
+                } else {
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(book.coverUrl)}`;
+                    const res = await fetch(proxyUrl);
+                    const blob = await res.blob();
+                    coverBase64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(blob);
+                    });
+                }
+            } catch (e) {
+                console.warn("Не удалось скачать обложку для FB2", e);
+            }
+        }
+
+        let fb2 = `<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+<description>
+    <title-info>
+        <book-title>${book.title.replace(/[&<>'"]/g, '')}</book-title>
+        <author><first-name>NeonReader</first-name><last-name>PRO</last-name></author>
+        ${coverBase64 ? `<coverpage><image l:href="#cover.jpg"/></coverpage>` : ''}
+    </title-info>
+    <document-info>
+        <program-used>NeonReader</program-used>
+        <date>${new Date().toLocaleDateString('ru-RU')}</date>
+        <id>${book.id}</id>
+        <version>1.0</version>
+    </document-info>
+</description>
+<body>
+    <title><p>${book.title.replace(/[&<>'"]/g, '')}</p></title>
+`;
+
+        ordered.forEach((ch, i) => {
+            fb2 += `\n<section>\n<title><p>Глава ${i + 1}</p></title>\n`;
+            let paragraphs = ch.text.split('\n').filter(p => p.trim());
+            paragraphs.forEach(p => {
+                let safeText = p.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                fb2 += `<p>${safeText}</p>\n`;
+            });
+            fb2 += `</section>\n`;
+        });
+
+        fb2 += `</body>\n`;
+
+        if (coverBase64) {
+            fb2 += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`;
+        }
+        
+        fb2 += `</FictionBook>`;
+
+        const fileName = `${book.title.replace(/[^a-zа-я0-9]/gi, '_')}.fb2`;
+
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+            try {
+                const b64Data = window.btoa(unescape(encodeURIComponent(fb2)));
+                await window.Capacitor.Plugins.Filesystem.writeFile({
+                    path: fileName,
+                    data: b64Data,
+                    directory: 'DOCUMENTS'
+                });
+                t.remove();
+                this.logToast(`Сохранено в Документы: ${fileName}`, "ok", 4000);
+                return;
+            } catch (e) {
+                console.warn("Filesystem write error, falling back to blob", e);
+            }
+        }
+
+        const blob = new Blob([fb2], { type: "application/xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        t.remove();
+        this.logToast("Книга FB2 сохранена!", "ok");
+    },
+
     renderLibraryGrid() {
         const grid = document.getElementById('library-grid');
         grid.innerHTML = '';
@@ -785,8 +918,9 @@ const app = {
                             ${btnAction}
                         </div>
                         <div style="display:flex; justify-content:space-between; margin-top:8px;">
-                            <button class="action-btn" style="color:#f59e0b; border:none; padding:4px;" onclick="app.clearBookCache('${book.id}')">🧹 КЭШ</button>
-                            <button class="action-btn" style="color:var(--danger); border:none; padding:4px;" onclick="app.deleteEntireBook('${book.id}')">🗑️ КНИГУ</button>
+                            <button class="action-btn" style="color:#f59e0b; border:none; padding:4px;" onclick="app.clearBookCache('${book.id}')" title="Очистить кэш">🧹 КЭШ</button>
+                            <button class="action-btn" style="color:#10b981; border:none; padding:4px;" onclick="app.exportToFB2('${book.id}')" title="Скачать в FB2">💾 FB2</button>
+                            <button class="action-btn" style="color:var(--danger); border:none; padding:4px;" onclick="app.deleteEntireBook('${book.id}')" title="Удалить">🗑️</button>
                         </div>
                     </div>
                 </div>
@@ -1215,13 +1349,11 @@ const app = {
                     return url;
                 }
             }
-            // В веб-режиме просто возвращаем чистую прямую ссылку, тегу <audio> прокси не нужен!
             return ttsUrl;
         } catch (e) { return ttsUrl; }
     },
 
     async play(index) {
-        console.log(`Играем индекс: ${index}`);
         if (index >= this.sents.length) {
             if (this.nextUrl && !this.isFetchingNext) {
                 this.isFetchingNext = true;
@@ -1294,15 +1426,9 @@ const app = {
     },
 
     togglePlay() {
-        if (!this.sents.length) {
-            this.clearToasts();
-            return this.logToast("Сначала загрузи главу!", "error");
-        }
-        if (this.isPlaying) {
-            this.stop();
-        } else {
-            this.play(this.currentIndex === -1 ? 0 : this.currentIndex);
-        }
+        if (!this.sents.length) return this.logToast("Сначала загрузи главу!", "error");
+        if (this.isPlaying) this.stop();
+        else this.play(this.currentIndex === -1 ? 0 : this.currentIndex);
         this.updateUI();
     },
 
