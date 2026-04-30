@@ -1102,20 +1102,23 @@ const app = {
         this.renderLibraryGrid(); 
         
         const badge = document.getElementById(`badge-${id}`);
-        let forwardUrl = book.url;
-        let backwardUrl = null;
-        let count = book.cachedCount || 0;
         const isTranslateMode = document.getElementById('mode-select').value === 'translate';
 
-        try {
-            let data = await this.networkFetchCore(forwardUrl, book.site || 'freeweb');
-            backwardUrl = data.prevUrl;
-            forwardUrl = data.nextUrl;
-            let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
-            await NeonDB.saveChapter(book.url, id, textToSave, data.nextUrl, data.prevUrl);
-            count++;
-            if(badge) badge.innerText = `${count} глав`;
-        } catch(e) {}
+        // 1. Точный пересчет глав в базе (восстанавливает счетчик, если он сбился)
+        let existingChaps = await NeonDB.getBookChapters(id);
+        let count = existingChaps.length;
+        book.cachedCount = count;
+        if(badge) badge.innerText = `${count} глав`;
+
+        let forwardUrl = book.url;
+        let backwardUrl = null;
+
+        // 2. Ищем концы цепочки, чтобы не качать первую главу заново
+        let firstChap = await NeonDB.getChapter(book.url);
+        if (firstChap) {
+            forwardUrl = firstChap.nextUrl;
+            backwardUrl = firstChap.prevUrl;
+        }
 
         while(this.activeDownloads[id] && (forwardUrl || backwardUrl)) {
             if (forwardUrl) {
@@ -1129,7 +1132,9 @@ const app = {
                         await NeonDB.saveChapter(forwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
                         forwardUrl = data.nextUrl;
                         count++;
+                        book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
+                        await this.saveLibraryData(); // СОХРАНЯЕМ ПРОГРЕСС ЖЕЛЕЗОБЕТОННО
                         await new Promise(r => setTimeout(r, 1500)); 
                     } catch(e) { forwardUrl = null; }
                 }
@@ -1145,14 +1150,15 @@ const app = {
                         await NeonDB.saveChapter(backwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
                         backwardUrl = data.prevUrl;
                         count++;
+                        book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
+                        await this.saveLibraryData(); // СОХРАНЯЕМ ПРОГРЕСС ЖЕЛЕЗОБЕТОННО
                         await new Promise(r => setTimeout(r, 1500)); 
                     } catch(e) { backwardUrl = null; }
                 }
             }
         }
         
-        book.cachedCount = count;
         book.isDownloading = false; 
         this.activeDownloads[id] = false;
         await this.saveLibraryData();
