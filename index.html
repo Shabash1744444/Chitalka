@@ -273,7 +273,8 @@
         <div style="text-align: left; margin-bottom: 15px;">
             <label style="font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase;">Формат файла:</label>
             <select id="export-format" class="custom-input" style="width: 100%; margin-top: 5px; font-weight: bold;">
-                <option value="fb2">FB2 (С обложкой и разметкой)</option>
+                <option value="fb2-light">FB2 (Легкий, БЕЗ обложки ⚡)</option>
+                <option value="fb2-heavy">FB2 (Тяжелый, С обложкой 🐢)</option>
                 <option value="txt">TXT (Чистый текст)</option>
             </select>
         </div>
@@ -296,7 +297,8 @@
 
         <div style="display: flex; gap: 10px;">
             <button class="action-btn" style="flex: 1; border-color: var(--danger); color: var(--danger);" onclick="app.closeExportModal()">ОТМЕНА</button>
-            <button class="action-btn btn-main" style="flex: 2; border-color: var(--success); color: var(--success); box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);" onclick="app.executeExport()">СОХРАНИТЬ ФАЙЛ</button>
+            <button class="action-btn btn-main" style="flex: 2; border-color: var(--success); color: var(--success); box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);" onclick="app.executeExport('file')">💾 В ФАЙЛ</button>
+            <button class="action-btn btn-main" style="flex: 2; border-color: #8b5cf6; color: #8b5cf6; box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);" onclick="app.executeExport('share')">📤 ПОДЕЛИТЬСЯ</button>
         </div>
     </div>
 </div>
@@ -435,6 +437,9 @@
             <button class="icon-btn" onclick="app.downloadMp3()" title="Скачать MP3">
                 <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             </button>
+            <button class="icon-btn" onclick="app.quickShareToYandex()" title="В Яндекс (Алиса)">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+            </button>
         </div>
 
         <div class="player-nav">
@@ -554,9 +559,21 @@ const app = {
         console.log("Шаг 2: Проверка среды...");
         if (window.Capacitor) {
             console.log("ОБНАРУЖЕН АПК");
+            // УЛУЧШЕННЫЙ ФОНОВЫЙ РЕЖИМ С УВЕДОМЛЕНИЕМ
             if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode) {
-                cordova.plugins.backgroundMode.enable();
-                cordova.plugins.backgroundMode.on('activate', () => cordova.plugins.backgroundMode.disableWebViewOptimizations());
+                const bgMode = cordova.plugins.backgroundMode;
+                bgMode.setDefaults({
+                    title: 'NeonReader PRO',
+                    text: 'Работа в фоне активна',
+                    resume: true,
+                    hidden: false,
+                    silent: true
+                });
+                bgMode.enable();
+                bgMode.on('activate', () => {
+                    bgMode.disableWebViewOptimizations();
+                    console.log("ФОНОВЫЙ РЕЖИМ: АКТИВИРОВАН");
+                });
             }
         }
 
@@ -825,18 +842,30 @@ const app = {
         document.getElementById('export-modal').style.display = 'none';
     },
 
+    // УЛУЧШЕННЫЙ САНИТАЙЗЕР (Спасает от зависаний)
     escapeXML(str) {
-        return str.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (!str) return "";
+        return str.trim()
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Убиваем невидимый мусор
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
     },
 
-    async executeExport() {
+    async executeExport(destination = 'file') {
         const id = this.exportBookId;
         if (!id) return;
         this.closeExportModal();
 
-        const format = document.getElementById('export-format').value; 
+        const formatSelect = document.getElementById('export-format').value; 
         const style = document.getElementById('export-style').value; 
         const scope = document.getElementById('export-scope').value; 
+
+        // Парсим выбор юзера
+        const format = formatSelect.startsWith('fb2') ? 'fb2' : 'txt';
+        const includeCover = formatSelect === 'fb2-heavy';
 
         const book = this.library.find(b => b.id === id);
         if (!book) return;
@@ -894,15 +923,11 @@ const app = {
             let ch = chapters.find(c => isSameUrl(c.url, currentUrl));
             if(!ch) break;
             
-            if (ch.text && ch.text.length > 100) {
-                ordered.push(ch);
-            }
-            
+            if (ch.text && ch.text.length > 100) ordered.push(ch);
             if (isSameUrl(currentUrl, ch.nextUrl)) break; 
             currentUrl = ch.nextUrl;
         }
 
-        // Бронебойный резерв для потерянных глав (Только если выбран режим "Всю цепь")
         if (scope === 'all' && ordered.length < chapters.length) {
             let missing = chapters.filter(c => !ordered.some(o => o.url === c.url));
             missing.forEach(ch => {
@@ -915,6 +940,7 @@ const app = {
 
         if (ordered.length === 0) ordered = chapters;
 
+        // УМНЫЙ ПАРСЕР НОМЕРОВ (внедрен)
         let lastNum = 0;
         let isFirstNum = true;
         ordered.forEach(ch => {
@@ -934,8 +960,9 @@ const app = {
         });
 
         let coverBase64 = "";
-        if (format === 'fb2' && book.coverUrl) {
+        if (includeCover && book.coverUrl) {
             try {
+                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Скачивание обложки...`;
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
                     const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url: book.coverUrl, responseType: 'base64' });
                     coverBase64 = res.data;
@@ -971,10 +998,12 @@ const app = {
 
         try {
             if (isNative) {
+                const targetDir = destination === 'share' ? 'CACHE' : 'DOCUMENTS';
+
                 const writeB64 = async (str, append) => {
                     const b64Data = window.btoa(unescape(encodeURIComponent(str)));
-                    if (append) { await window.Capacitor.Plugins.Filesystem.appendFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' }); } 
-                    else { await window.Capacitor.Plugins.Filesystem.writeFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' }); }
+                    if (append) { await window.Capacitor.Plugins.Filesystem.appendFile({ path: fileName, data: b64Data, directory: targetDir }); } 
+                    else { await window.Capacitor.Plugins.Filesystem.writeFile({ path: fileName, data: b64Data, directory: targetDir }); }
                 };
                 
                 if(t && t.querySelector('span')) t.querySelector('span').innerText = `Создание файла...`;
@@ -1004,14 +1033,21 @@ const app = {
                     }
                     
                     await writeB64(chunk, true);
-                    if(i % 10 === 0) await new Promise(r => setTimeout(r, 50)); 
+                    // CHUNKING: Дыхание кода, спасает от зависания (внедрено)
+                    if(i % 10 === 0) await new Promise(r => setTimeout(r, 10)); 
                 }
 
                 if(t && t.querySelector('span')) t.querySelector('span').innerText = `Завершение...`;
                 await writeB64(footer, true);
 
-                t.remove();
-                this.logToast(`Успешно сохранено: ${fileName}`, "ok", 5000);
+                if (destination === 'share' && window.Capacitor.Plugins.Share) {
+                    let fileUri = await window.Capacitor.Plugins.Filesystem.getUri({ path: fileName, directory: targetDir });
+                    t.remove();
+                    await window.Capacitor.Plugins.Share.share({ title: book.title, url: fileUri.uri, dialogTitle: 'Открыть с помощью...' });
+                } else {
+                    t.remove();
+                    this.logToast(`Успешно сохранено: ${fileName}`, "ok", 5000);
+                }
 
             } else {
                 let fileParts = [header];
@@ -1044,23 +1080,62 @@ const app = {
 
                 const mimeType = format === 'fb2' ? "application/xml;charset=utf-8" : "text/plain;charset=utf-8";
                 const blob = new Blob(fileParts, { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
                 
-                t.remove();
-                this.logToast(`Файл скачан: ${fileName}`, "ok");
+                if (destination === 'share' && navigator.share) {
+                    t.remove();
+                    const file = new File([blob], fileName, { type: mimeType });
+                    await navigator.share({ title: book.title, files: [file] });
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    t.remove();
+                    this.logToast(`Файл скачан: ${fileName}`, "ok");
+                }
             }
 
         } catch (e) {
             console.error("Export Error:", e);
             t.remove();
             this.logToast("Сбой при сохранении: " + e.message, "error", 5000);
+        }
+    },
+
+    // НОВАЯ ФУНКЦИЯ: БЫСТРЫЙ ЭКСПОРТ ТЕКУЩЕЙ ГЛАВЫ (внедрена)
+    async quickShareToYandex() {
+        if (this.sents.length === 0) {
+            this.clearToasts();
+            return this.logToast("Сначала загрузи текст!", "error");
+        }
+        let t = this.logToast("Формируем пакет для Алисы...", "ok", 0);
+        let chapterText = `=== ${this.currentBookMetadata.title || "Глава"} ===\n\n`;
+        chapterText += this.sents.join("\n\n");
+        let fileName = "Alice_Temp_Reader.txt";
+        
+        try {
+            if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share) {
+                const FS = window.Capacitor.Plugins.Filesystem;
+                const Share = window.Capacitor.Plugins.Share;
+                const result = await FS.writeFile({
+                    path: fileName,
+                    data: window.btoa(unescape(encodeURIComponent(chapterText))),
+                    directory: 'CACHE'
+                });
+                t.remove();
+                await Share.share({ title: 'Слушать Алисой', url: result.uri, dialogTitle: 'Открыть в Яндекс Браузере' });
+            } else if (navigator.share) {
+                t.remove();
+                await navigator.share({ title: 'NeonReader', text: chapterText });
+            }
+        } catch(e) {
+            console.error("Share error:", e);
+            t.remove();
+            this.logToast("Сбой при отправке", "error");
         }
     },
 
@@ -1304,6 +1379,12 @@ const app = {
                         count++;
                         book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
+                        
+                        // ОБНОВЛЯЕМ ШТОРКУ В ФОНЕ (внедрено)
+                        if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode && cordova.plugins.backgroundMode.isActive()) {
+                            cordova.plugins.backgroundMode.configure({ text: `Загрузка: ${count} глав` });
+                        }
+
                         await this.saveLibraryData(); 
                         await new Promise(r => setTimeout(r, 1500)); 
                     } catch(e) { forwardUrl = null; }
@@ -1322,6 +1403,12 @@ const app = {
                         count++;
                         book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
+                        
+                        // ОБНОВЛЯЕМ ШТОРКУ В ФОНЕ (внедрено)
+                        if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode && cordova.plugins.backgroundMode.isActive()) {
+                            cordova.plugins.backgroundMode.configure({ text: `Загрузка: ${count} глав` });
+                        }
+
                         await this.saveLibraryData(); 
                         await new Promise(r => setTimeout(r, 1500)); 
                     } catch(e) { backwardUrl = null; }
@@ -1381,7 +1468,6 @@ const app = {
                 this.prevUrl = data.prevUrl;
                 this.currentBookMetadata.title = data.title;
                 this.currentBookMetadata.cover = data.cover;
-                // Сохраняем оригинал
                 await NeonDB.saveChapter(url, this.currentBookId, rawText, data.nextUrl, data.prevUrl);
             } catch (e) { 
                 if (e.message.includes("Требуется обход защиты")) return;
@@ -1399,7 +1485,6 @@ const app = {
             let tTr = this.logToast("Нейроперевод...", "ok", 0);
             try {
                 finalText = await this.translate(rawText);
-                // Перезаписываем перевод
                 await NeonDB.saveChapter(url, this.currentBookId, finalText, this.nextUrl, this.prevUrl);
                 this.render(finalText, isAppend, chapterLabel);
                 tTr.remove();
@@ -1448,7 +1533,6 @@ const app = {
         if(!this.chapterMarkers) this.chapterMarkers = [];
         this.chapterMarkers.push({ index: this.sents.length, title: chapterTitle });
 
-        // Жесткий лимит для Google Premium
         const chunkSize = 200; 
         
         let cleanedText = text.replace(/\n\s*\n/g, '\n');
