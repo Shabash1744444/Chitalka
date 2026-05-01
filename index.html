@@ -278,6 +278,14 @@
             </select>
         </div>
 
+        <div style="text-align: left; margin-bottom: 15px;">
+            <label style="font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase;">Объем выгрузки:</label>
+            <select id="export-scope" class="custom-input" style="width: 100%; margin-top: 5px; font-weight: bold; color: var(--theme-hex);">
+                <option value="forward">Только вперед (С текущей главы)</option>
+                <option value="all">Всю цепь (Отмотать в начало)</option>
+            </select>
+        </div>
+
         <div style="text-align: left; margin-bottom: 25px;">
             <label style="font-size: 11px; color: var(--subtext); font-weight: bold; text-transform: uppercase;">Форматирование текста:</label>
             <select id="export-style" class="custom-input" style="width: 100%; margin-top: 5px; font-weight: bold;">
@@ -451,7 +459,6 @@
 </footer>
 
 <script>
-// УБИВАЕМ ЗАСТРЯВШИЙ СЕРВИС-ВОРКЕР
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(registrations) {
         for (let registration of registrations) { registration.unregister(); }
@@ -556,7 +563,7 @@ const app = {
         this.players.forEach((p, idx) => {
             p.id = 'neon-player-' + idx;
             p.style.display = 'none';
-            document.body.appendChild(p); // Вшиваем плееры физически, чтобы Android их не убил
+            document.body.appendChild(p);
             
             p.preservesPitch = true;
             p.webkitPreservesPitch = true;
@@ -822,76 +829,115 @@ const app = {
         return str.trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
-        async executeExport() {
+    async executeExport() {
         const id = this.exportBookId;
         if (!id) return;
         this.closeExportModal();
 
         const format = document.getElementById('export-format').value; 
         const style = document.getElementById('export-style').value; 
+        const scope = document.getElementById('export-scope').value; 
 
         const book = this.library.find(b => b.id === id);
         if (!book) return;
         
         let t = this.logToast("Подготовка к экспорту...", "ok", 0);
-        const chapters = await NeonDB.getBookChapters(id);
         
+        const allChaptersInDB = await new Promise(resolve => {
+            const req = NeonDB.db.transaction("chapters", "readonly").objectStore("chapters").getAll();
+            req.onsuccess = () => resolve(req.result || []);
+        });
+
+        let keyword = "";
+        try {
+            let urlObj = new URL(book.url);
+            let parts = urlObj.pathname.split(/[\/\-_\.]/).filter(p => p.length > 4 && !p.toLowerCase().includes('chapter'));
+            keyword = parts[0] || urlObj.hostname; 
+        } catch(e) { keyword = "chapter"; }
+
+        let chapters = allChaptersInDB.filter(c => c.url.includes(keyword) && c.text && c.text.length > 100);
+
         if (!chapters || chapters.length === 0) {
             t.remove();
             return this.logToast("Сначала скачайте главы!", "error");
         }
 
-        // 1. Ищем абсолютное начало сохраненного куска (отматываем цепочку назад)
-        let firstChap = chapters.find(c => c.url === book.url);
-        if (firstChap) {
-            while (firstChap.prevUrl) {
-                let prev = chapters.find(c => c.url === firstChap.prevUrl);
-                if (prev) firstChap = prev;
-                else break;
+        const isSameUrl = (u1, u2) => {
+            if (!u1 || !u2) return false;
+            if (u1 === u2) return true;
+            try { return new URL(u1).pathname.replace(/\/$/, '') === new URL(u2).pathname.replace(/\/$/, ''); } 
+            catch(e) { return u1 === u2; }
+        };
+
+        let currentUrl = book.url; 
+
+        if (scope === 'all') {
+            let firstChap = chapters.find(c => isSameUrl(c.url, book.url)) || chapters[0];
+            if (firstChap) {
+                let visited = new Set();
+                while (firstChap.prevUrl && !visited.has(firstChap.url)) {
+                    visited.add(firstChap.url);
+                    if (isSameUrl(firstChap.url, firstChap.prevUrl)) break; 
+                    let prev = chapters.find(c => isSameUrl(c.url, firstChap.prevUrl));
+                    if (prev) firstChap = prev;
+                    else break;
+                }
+                currentUrl = firstChap.url;
             }
-        } else if (chapters.length > 0) {
-            firstChap = chapters[0]; 
         }
 
-        // 2. Выстраиваем правильную последовательность
         let ordered = [];
-        let currentUrl = firstChap ? firstChap.url : null;
-        while(currentUrl) {
-            let ch = chapters.find(c => c.url === currentUrl);
+        let visitedForward = new Set();
+
+        while(currentUrl && !visitedForward.has(currentUrl)) {
+            visitedForward.add(currentUrl);
+            let ch = chapters.find(c => isSameUrl(c.url, currentUrl));
             if(!ch) break;
-            ordered.push(ch);
+            
+            if (ch.text && ch.text.length > 100) {
+                ordered.push(ch);
+            }
+            
+            if (isSameUrl(currentUrl, ch.nextUrl)) break; 
             currentUrl = ch.nextUrl;
         }
+
+        // Бронебойный резерв для потерянных глав (Только если выбран режим "Всю цепь")
+        if (scope === 'all' && ordered.length < chapters.length) {
+            let missing = chapters.filter(c => !ordered.some(o => o.url === c.url));
+            missing.forEach(ch => {
+                let m = ch.url.match(/(?:chapter|ch|c|glava|gl|v\d+c|interlude|extra|special)[-_\s]*(\d+(?:[\.\-_]\d+)?)/i) || ch.url.match(/[-_](\d+(?:[\.\-_]\d+)?)(?:\.html|\/|)$/i);
+                ch.guessedNum = m ? parseFloat(m[1].replace(/[-_]/g, '.')) : 999999;
+            });
+            missing.sort((a, b) => a.guessedNum - b.guessedNum);
+            ordered.push(...missing);
+        }
+
         if (ordered.length === 0) ordered = chapters;
 
-        // ===== УМНЫЙ ПАРСЕР НОМЕРОВ ГЛАВ ИЗ ССЫЛОК (РЕШЕНИЕ ТВОЕЙ ПРОБЛЕМЫ) =====
         let lastNum = 0;
         let isFirstNum = true;
         ordered.forEach(ch => {
-            // Ищем в ссылке слова chapter, ch, c, glava + цифры (включая дробные, типа 178.5)
-            let match = ch.url.match(/(?:chapter|ch|c|glava|gl|v\d+c)[-_\s]*(\d+(?:\.\d+)?)/i);
-            if (!match) match = ch.url.match(/[-_](\d+)(?:\.html|\/|)$/i); // Резервный поиск числа перед .html
+            ch.isInterlude = /interlude|extra|side[-_]?story|special/i.test(ch.url);
+            ch.prefix = ch.isInterlude ? "Интерлюдия" : "Глава";
+
+            let m = ch.url.match(/(?:chapter|ch|c|glava|gl|v\d+c|interlude|extra|special)[-_\s]*(\d+(?:[\.\-_]\d+)?)/i) || ch.url.match(/[-_](\d+(?:[\.\-_]\d+)?)(?:\.html|\/|)$/i);
             
-            if (match) {
-                ch.displayNumber = match[1];
-                lastNum = parseFloat(match[1]);
+            if (m) {
+                let cleanNum = m[1].replace(/[-_]/g, '.');
+                ch.displayNumber = parseFloat(cleanNum);
+                if (!ch.isInterlude) lastNum = ch.displayNumber; 
             } else {
-                // Если номера в ссылке нет, просто делаем +1 от прошлой главы
-                ch.displayNumber = isFirstNum ? 1 : Math.floor(lastNum) + 1;
-                lastNum = ch.displayNumber;
+                ch.displayNumber = isFirstNum ? 1 : lastNum + 0.5;
             }
             isFirstNum = false;
         });
-        // =========================================================================
 
         let coverBase64 = "";
         if (format === 'fb2' && book.coverUrl) {
             try {
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
-                    const res = await window.Capacitor.Plugins.CapacitorHttp.get({
-                        url: book.coverUrl,
-                        responseType: 'base64'
-                    });
+                    const res = await window.Capacitor.Plugins.CapacitorHttp.get({ url: book.coverUrl, responseType: 'base64' });
                     coverBase64 = res.data;
                     if (coverBase64.includes(',')) coverBase64 = coverBase64.split(',')[1];
                 } else {
@@ -904,9 +950,7 @@ const app = {
                         reader.readAsDataURL(blob);
                     });
                 }
-            } catch (e) {
-                console.warn("Не удалось скачать обложку", e);
-            }
+            } catch (e) { console.warn("Не удалось скачать обложку", e); }
         }
 
         const fileName = `${book.title.replace(/[^a-zа-я0-9]/gi, '_')}.${format}`;
@@ -918,9 +962,7 @@ const app = {
         if (format === 'fb2') {
             header = `<?xml version="1.0" encoding="utf-8"?>\n<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">\n<description>\n    <title-info>\n        <book-title>${this.escapeXML(book.title)}</book-title>\n        <author><first-name>NeonReader</first-name><last-name>PRO</last-name></author>\n        ${coverBase64 ? `<coverpage><image l:href="#cover.jpg"/></coverpage>` : ''}\n    </title-info>\n    <document-info>\n        <program-used>NeonReader</program-used>\n        <date>${new Date().toLocaleDateString('ru-RU')}</date>\n        <id>${book.id}</id>\n        <version>1.0</version>\n    </document-info>\n</description>\n<body>\n    <title><p>${this.escapeXML(book.title)}</p></title>\n`;
             footer = `</body>\n`;
-            if (coverBase64) {
-                footer += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`;
-            }
+            if (coverBase64) { footer += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`; }
             footer += `</FictionBook>`;
         } else {
             header = `${book.title}\n=======================\n\n`;
@@ -931,11 +973,8 @@ const app = {
             if (isNative) {
                 const writeB64 = async (str, append) => {
                     const b64Data = window.btoa(unescape(encodeURIComponent(str)));
-                    if (append) {
-                        await window.Capacitor.Plugins.Filesystem.appendFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' });
-                    } else {
-                        await window.Capacitor.Plugins.Filesystem.writeFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' });
-                    }
+                    if (append) { await window.Capacitor.Plugins.Filesystem.appendFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' }); } 
+                    else { await window.Capacitor.Plugins.Filesystem.writeFile({ path: fileName, data: b64Data, directory: 'DOCUMENTS' }); }
                 };
                 
                 if(t && t.querySelector('span')) t.querySelector('span').innerText = `Создание файла...`;
@@ -943,42 +982,32 @@ const app = {
 
                 for (let i = 0; i < ordered.length; i++) {
                     if(i % 5 === 0) {
-                        if(t && t.querySelector('span')) t.querySelector('span').innerText = `Сохранение: ${i + 1} / ${ordered.length} глав...`;
+                        if(t && t.querySelector('span')) t.querySelector('span').innerText = `Сборка: ${i + 1} / ${ordered.length} глав...`;
                     }
                     
                     let ch = ordered[i];
                     let chunk = "";
                     let textToProcess = ch.text;
-                    
-                    if (style === 'solid') {
-                        textToProcess = textToProcess.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
-                    }
+                    if (style === 'solid') textToProcess = textToProcess.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
 
+                    let titleText = `${ch.prefix} ${ch.displayNumber}`;
+                    
                     if (format === 'fb2') {
-                        // ВСТАВЛЯЕМ УМНЫЙ НОМЕР
-                        chunk += `\n<section>\n<title><p>Глава ${ch.displayNumber}</p></title>\n`;
-                        if (style === 'solid') {
-                            chunk += `<p>${this.escapeXML(textToProcess)}</p>\n`;
-                        } else {
-                            let paras = textToProcess.split('\n').filter(p => p.trim());
-                            paras.forEach(p => { chunk += `<p>${this.escapeXML(p)}</p>\n`; });
-                        }
+                        chunk += `\n<section>\n<title><p>${titleText}</p></title>\n`;
+                        if (style === 'solid') { chunk += `<p>${this.escapeXML(textToProcess)}</p>\n`; } 
+                        else { textToProcess.split('\n').filter(p => p.trim()).forEach(p => { chunk += `<p>${this.escapeXML(p)}</p>\n`; }); }
                         chunk += `</section>\n`;
                     } else {
-                        // ВСТАВЛЯЕМ УМНЫЙ НОМЕР
-                        chunk += `\n\n--- Глава ${ch.displayNumber} ---\n\n`;
-                        if (style === 'solid') {
-                            chunk += textToProcess + "\n";
-                        } else {
-                            chunk += textToProcess.split('\n').filter(p => p.trim()).join('\n\n') + "\n";
-                        }
+                        chunk += `\n\n--- ${titleText} ---\n\n`;
+                        if (style === 'solid') { chunk += textToProcess + "\n"; } 
+                        else { chunk += textToProcess.split('\n').filter(p => p.trim()).join('\n\n') + "\n"; }
                     }
                     
                     await writeB64(chunk, true);
                     if(i % 10 === 0) await new Promise(r => setTimeout(r, 50)); 
                 }
 
-                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Завершение файла...`;
+                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Завершение...`;
                 await writeB64(footer, true);
 
                 t.remove();
@@ -995,27 +1024,19 @@ const app = {
                     let ch = ordered[i];
                     let chunk = "";
                     let textToProcess = ch.text;
-                    
-                    if (style === 'solid') {
-                        textToProcess = textToProcess.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
-                    }
+                    if (style === 'solid') textToProcess = textToProcess.replace(/\n+/g, ' ').replace(/\s+/g, ' ');
+
+                    let titleText = `${ch.prefix} ${ch.displayNumber}`;
 
                     if (format === 'fb2') {
-                        chunk += `\n<section>\n<title><p>Глава ${ch.displayNumber}</p></title>\n`;
-                        if (style === 'solid') {
-                            chunk += `<p>${this.escapeXML(textToProcess)}</p>\n`;
-                        } else {
-                            let paras = textToProcess.split('\n').filter(p => p.trim());
-                            paras.forEach(p => { chunk += `<p>${this.escapeXML(p)}</p>\n`; });
-                        }
+                        chunk += `\n<section>\n<title><p>${titleText}</p></title>\n`;
+                        if (style === 'solid') { chunk += `<p>${this.escapeXML(textToProcess)}</p>\n`; } 
+                        else { textToProcess.split('\n').filter(p => p.trim()).forEach(p => { chunk += `<p>${this.escapeXML(p)}</p>\n`; }); }
                         chunk += `</section>\n`;
                     } else {
-                        chunk += `\n\n--- Глава ${ch.displayNumber} ---\n\n`;
-                        if (style === 'solid') {
-                            chunk += textToProcess + "\n";
-                        } else {
-                            chunk += textToProcess.split('\n').filter(p => p.trim()).join('\n\n') + "\n";
-                        }
+                        chunk += `\n\n--- ${titleText} ---\n\n`;
+                        if (style === 'solid') { chunk += textToProcess + "\n"; } 
+                        else { chunk += textToProcess.split('\n').filter(p => p.trim()).join('\n\n') + "\n"; }
                     }
                     fileParts.push(chunk);
                 }
@@ -1042,7 +1063,6 @@ const app = {
             this.logToast("Сбой при сохранении: " + e.message, "error", 5000);
         }
     },
-
 
     renderLibraryGrid() {
         const grid = document.getElementById('library-grid');
@@ -1256,7 +1276,6 @@ const app = {
         const badge = document.getElementById(`badge-${id}`);
         const isTranslateMode = document.getElementById('mode-select').value === 'translate';
 
-        // 1. Точный пересчет глав в базе (восстанавливает счетчик, если он сбился)
         let existingChaps = await NeonDB.getBookChapters(id);
         let count = existingChaps.length;
         book.cachedCount = count;
@@ -1265,28 +1284,27 @@ const app = {
         let forwardUrl = book.url;
         let backwardUrl = null;
 
-        // 2. Ищем концы цепочки, чтобы не качать первую главу заново
         let firstChap = await NeonDB.getChapter(book.url);
         if (firstChap) {
-            forwardUrl = firstChap.nextUrl;
-            backwardUrl = firstChap.prevUrl;
+            forwardUrl = (firstChap.nextUrl === book.url) ? null : firstChap.nextUrl;
+            backwardUrl = (firstChap.prevUrl === book.url) ? null : firstChap.prevUrl;
         }
 
         while(this.activeDownloads[id] && (forwardUrl || backwardUrl)) {
             if (forwardUrl) {
                 let existing = await NeonDB.getChapter(forwardUrl);
                 if (existing) { 
-                    forwardUrl = existing.nextUrl; 
+                    forwardUrl = (forwardUrl === existing.nextUrl) ? null : existing.nextUrl; 
                 } else {
                     try {
                         let data = await this.networkFetchCore(forwardUrl, book.site || 'freeweb');
                         let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
                         await NeonDB.saveChapter(forwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
-                        forwardUrl = data.nextUrl;
+                        forwardUrl = (forwardUrl === data.nextUrl) ? null : data.nextUrl;
                         count++;
                         book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
-                        await this.saveLibraryData(); // СОХРАНЯЕМ ПРОГРЕСС ЖЕЛЕЗОБЕТОННО
+                        await this.saveLibraryData(); 
                         await new Promise(r => setTimeout(r, 1500)); 
                     } catch(e) { forwardUrl = null; }
                 }
@@ -1294,17 +1312,17 @@ const app = {
             if (backwardUrl && this.activeDownloads[id]) {
                 let existing = await NeonDB.getChapter(backwardUrl);
                 if (existing) { 
-                    backwardUrl = existing.prevUrl; 
+                    backwardUrl = (backwardUrl === existing.prevUrl) ? null : existing.prevUrl; 
                 } else {
                     try {
                         let data = await this.networkFetchCore(backwardUrl, book.site || 'freeweb');
                         let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
                         await NeonDB.saveChapter(backwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
-                        backwardUrl = data.prevUrl;
+                        backwardUrl = (backwardUrl === data.prevUrl) ? null : data.prevUrl;
                         count++;
                         book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
-                        await this.saveLibraryData(); // СОХРАНЯЕМ ПРОГРЕСС ЖЕЛЕЗОБЕТОННО
+                        await this.saveLibraryData(); 
                         await new Promise(r => setTimeout(r, 1500)); 
                     } catch(e) { backwardUrl = null; }
                 }
