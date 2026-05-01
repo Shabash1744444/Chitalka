@@ -27,7 +27,7 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/filesystem @capacitor/app @capacitor/browser @capacitor/share
           npm install html-minifier-terser
-          # УСТАНАВЛИВАЕМ ПЛАГИН ДЛЯ ФОНОВОГО ЗВУКА
+          # УСТАНАВЛИВАЕМ ПЛАГИН ДЛЯ ФОНОВОГО ЗВУКА И ПРОЦЕССА
           npm install cordova-plugin-background-mode
 
       - name: Prepare Web Content
@@ -76,9 +76,13 @@ jobs:
           sed -i '/<application/i <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' $MANIFEST
-          # ПРАВА ДЛЯ ФОНОВОЙ РАБОТЫ АНДРОИДА
+          
+          # ПРАВА ДЛЯ ФОНОВОЙ РАБОТЫ АНДРОИДА И УВЕДОМЛЕНИЙ (ВНЕДРЕНО)
           sed -i '/<application/i <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
           sed -i '/<application/i <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />' $MANIFEST
+          sed -i '/<application/i <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />' $MANIFEST
+          sed -i '/<application/i <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />' $MANIFEST
+          
           # ВАЖНО: Добавил usesCleartextTraffic и largeHeap
           sed -i 's/android:supportsRtl="true"/android:supportsRtl="true" android:usesCleartextTraffic="true" android:largeHeap="true" android:hardwareAccelerated="true"/' $MANIFEST
 
