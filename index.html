@@ -1346,15 +1346,50 @@ const app = {
         this.logToast(`Парсинг DOM...`, 'ok', 500);
         console.log("Начинаем парсинг текста из HTML...");
 
+        console.log("Начинаем парсинг текста из HTML...");
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        let sel = 'p';
-        if (site === 'novelbin') sel = '.chr-c p, #chr-content p';
-        else if (site === 'freeweb' || site === 'freewebnovel') sel = '.txt p, .article-content p';
-        else if (site === 'lightnovelpub') sel = '#chapter-container p, .chapter-content p';
-        else sel = 'p, div.text, div.content, .chapter-content p'; 
+        
+        let paras = [];
+        
+        // 1. Ищем главный контейнер с текстом (универсально для СНГ-сайтов и ainovel)
+        let mainContainer = doc.querySelector('.chapter-content, #chapter-content, .text-content, .text-left, article, .reader-text');
+        
+        if (mainContainer || url.includes('ainovel')) {
+            let block = mainContainer || doc.body; // если контейнер не найден, ищем по всему body
+            // Сначала пробуем вытащить параграфы
+            paras = Array.from(block.querySelectorAll('p, div.text')).map(p => p.innerText.trim());
+            
+            // Если абзацев мало (вероятно текст разделен просто <br>), бьем по переносам
+            if (paras.length < 3 && mainContainer) {
+                paras = mainContainer.innerHTML.split(/<br\s*\/?>/i).map(text => {
+                    let tmp = document.createElement('div');
+                    tmp.innerHTML = text;
+                    return tmp.innerText.trim();
+                });
+            }
+        } 
+        
+        // 2. Если предыдущий шаг ничего не дал, используем старые селекторы
+        if (paras.length < 3) {
+            let sel = 'p';
+            if (site === 'novelbin') sel = '.chr-c p, #chr-content p';
+            else if (site === 'freeweb' || site === 'freewebnovel') sel = '.txt p, .article-content p';
+            else if (site === 'lightnovelpub') sel = '#chapter-container p, .chapter-content p';
+            else sel = 'p, div.text, div.content, .chapter-content p'; 
+            
+            paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim());
+        }
 
-        let paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim()).filter(text => text.length > 20);
-        if (paras.length < 3) paras = Array.from(doc.querySelectorAll('p')).map(p => p.innerText.trim()).filter(text => text.length > 30);
+        // 3. Жесткая фильтрация системного мусора (куки, копирайты, меню)
+        paras = paras.filter(text => {
+            if (text.length < 20) return false;
+            let lower = text.toLowerCase();
+            if (lower.includes('мы используем cookie')) return false;
+            if (lower.includes('все права защищены')) return false;
+            if (lower.includes('опишите проблему')) return false;
+            if (lower.includes('войдите, чтобы оставить комментарий')) return false;
+            return true;
+        });
         
         console.log(`Найдено абзацев: ${paras.length}`);
         if (paras.length === 0) {
