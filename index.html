@@ -1345,52 +1345,79 @@ const app = {
 
         this.logToast(`Парсинг DOM...`, 'ok', 500);
         console.log("Начинаем парсинг текста из HTML...");
-
-        console.log("Начинаем парсинг текста из HTML...");
         const doc = new DOMParser().parseFromString(html, 'text/html');
         
+        // 0. Сразу вырезаем скрипты и стили, чтобы они не попали в текст
+        doc.querySelectorAll('script, style, noscript, svg, iframe').forEach(el => el.remove());
+        
         let paras = [];
+        let mainContainer = null;
+
+        // 1. Умный поиск: ищем блок с наибольшим объемом чистого текста
+        let selectors = '.chapter-content, #chapter-content, .text-content, .text-left, article, .reader-text, .chapter-text, .entry-content, [itemprop="articleBody"]';
+        let nodes = Array.from(doc.querySelectorAll(selectors));
         
-        // 1. Ищем главный контейнер с текстом (универсально для СНГ-сайтов и ainovel)
-        let mainContainer = doc.querySelector('.chapter-content, #chapter-content, .text-content, .text-left, article, .reader-text');
-        
-        if (mainContainer || url.includes('ainovel')) {
-            let block = mainContainer || doc.body; // если контейнер не найден, ищем по всему body
-            // Сначала пробуем вытащить параграфы
-            paras = Array.from(block.querySelectorAll('p, div.text')).map(p => p.innerText.trim());
-            
-            // Если абзацев мало (вероятно текст разделен просто <br>), бьем по переносам
-            if (paras.length < 3 && mainContainer) {
-                paras = mainContainer.innerHTML.split(/<br\s*\/?>/i).map(text => {
-                    let tmp = document.createElement('div');
-                    tmp.innerHTML = text;
-                    return tmp.innerText.trim();
-                });
-            }
-        } 
-        
-        // 2. Если предыдущий шаг ничего не дал, используем старые селекторы
-        if (paras.length < 3) {
-            let sel = 'p';
-            if (site === 'novelbin') sel = '.chr-c p, #chr-content p';
-            else if (site === 'freeweb' || site === 'freewebnovel') sel = '.txt p, .article-content p';
-            else if (site === 'lightnovelpub') sel = '#chapter-container p, .chapter-content p';
-            else sel = 'p, div.text, div.content, .chapter-content p'; 
-            
-            paras = Array.from(doc.querySelectorAll(sel)).map(p => p.innerText.trim());
+        // Если по классам пусто, берем ВООБЩЕ ВСЕ <div> на странице
+        if (nodes.length === 0) {
+            nodes = Array.from(doc.querySelectorAll('div'));
         }
 
-        // 3. Жесткая фильтрация системного мусора (куки, копирайты, меню)
+        let maxScore = 0;
+        nodes.forEach(node => {
+            let text = node.textContent.trim();
+            if (text.length < 300) return; // Игнорируем мелочь
+            
+            // Считаем "мусорность" блока (ссылки, меню, подвалы)
+            let trashLen = Array.from(node.querySelectorAll('a, nav, footer, header, ul')).reduce((sum, el) => sum + (el.textContent ? el.textContent.length : 0), 0);
+            
+            // Очки = общий текст минус мусор (жестко штрафуем блоки с кучей ссылок)
+            let score = text.length - (trashLen * 3);
+            
+            if (score > maxScore) {
+                maxScore = score;
+                mainContainer = node;
+            }
+        });
+
+        if (mainContainer) {
+            console.log("Найден главный контейнер. Длина текста:", mainContainer.textContent.length);
+            
+            // 2. Ищем теги <p> внутри победившего блока
+            let pTags = Array.from(mainContainer.querySelectorAll('p, div.text'));
+            
+            if (pTags.length > 5) {
+                // Если есть нормальные параграфы — берем их
+                paras = pTags.map(p => p.textContent.trim());
+            } else {
+                // Если <p> нет, значит текст закинут сплошняком через <br>
+                let rawHtml = mainContainer.innerHTML;
+                
+                // Превращаем все виды переносов в наш спец-разделитель
+                rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '|||SPLIT|||');
+                rawHtml = rawHtml.replace(/<\/p>/gi, '|||SPLIT|||');
+                rawHtml = rawHtml.replace(/<\/div>/gi, '|||SPLIT|||');
+                
+                let tmpDiv = document.createElement('div');
+                paras = rawHtml.split('|||SPLIT|||').map(chunk => {
+                    tmpDiv.innerHTML = chunk;
+                    return tmpDiv.textContent.trim();
+                });
+            }
+        }
+
+        // 3. Жесткий анти-мусорный фильтр (добивочный)
         paras = paras.filter(text => {
             if (text.length < 20) return false;
             let lower = text.toLowerCase();
             if (lower.includes('мы используем cookie')) return false;
             if (lower.includes('все права защищены')) return false;
             if (lower.includes('опишите проблему')) return false;
-            if (lower.includes('войдите, чтобы оставить комментарий')) return false;
+            if (lower.includes('войдите, чтобы оставить')) return false;
+            if (lower.includes('следующая глава')) return false;
+            if (lower.includes('предыдущая глава')) return false;
             return true;
         });
-        
+
         console.log(`Найдено абзацев: ${paras.length}`);
         if (paras.length === 0) {
             this.logToast("СБОЙ: Текст не найден в разметке сайта.", "error", 10000);
