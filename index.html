@@ -45,7 +45,6 @@
         console.error = function(...args) {
             originalError.apply(console, args);
             printToDevConsole(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#f00');
-            // Триггер для фонарика
             if (window.app) { window.app.errorCount++; window.app.updateLantern(); }
         };
 
@@ -105,7 +104,6 @@
         .icon-sm { width: 16px; height: 16px; }
         .icon-fill { fill: currentColor; stroke: none; }
 
-        /* НЕОНОВЫЙ ФОНАРИК */
         .lantern {
             color: var(--lantern-color);
             filter: drop-shadow(0 0 calc(8px * var(--glow-int)) var(--lantern-color));
@@ -120,7 +118,6 @@
         #dev-console-header { display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid #333; color: #fff; font-weight: bold; }
         #dev-console-list { flex: 1; overflow-y: auto; padding-top: 10px; }
 
-        /* МИКРО-ТОСТЫ: Левый нижний угол, не мешают кликам */
         #toast-container { 
             position: fixed; bottom: calc(env(safe-area-inset-bottom) + 85px); left: 15px; 
             z-index: 99999; display: flex; flex-direction: column; gap: 6px; 
@@ -131,7 +128,7 @@
             border-left: 3px solid var(--theme-hex); color: #fff; font-size: 11px; font-weight: 500;
             padding: 8px 12px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             animation: toastSlide 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            pointer-events: none; /* Пропускает клики сквозь себя */
+            pointer-events: none; 
         }
         .toast.error { border-left-color: var(--danger); }
         .toast.fadeOut { animation: fadeOut 0.3s ease forwards; }
@@ -210,7 +207,6 @@
         .paragraph { margin-bottom: 20px; color: var(--text-color); opacity: 0; animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* МИКРО-ШРИФТ И ЗАКЛАДКИ */
         .sentence { font-size: var(--text-size); cursor: pointer; transition: all 0.2s ease; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; position: relative; }
         .sentence.active { background: rgba(var(--theme-rgb), 0.2); color: var(--text-color); font-weight: 600; text-shadow: 0 0 calc(8px * var(--glow-int)) var(--theme-hex); display: inline-block; z-index: 2; border-bottom: 1px solid var(--theme-hex); box-shadow: 0 4px calc(15px * var(--glow-int)) rgba(var(--theme-rgb), 0.3); }
         .bookmark-icon { font-size: 14px; filter: drop-shadow(0 0 5px var(--theme-hex)); margin-left: 5px; vertical-align: middle; }
@@ -681,7 +677,6 @@ const app = {
         if (container) container.innerHTML = '';
     },
 
-    // МИКРО-ТОСТЫ
     logToast(msg, type = 'ok', duration = 2500) {
         console.log(`[TOAST] ${msg}`);
         const container = document.getElementById('toast-container');
@@ -791,11 +786,9 @@ const app = {
     },
 
     loadSitesData() {
-        const defaults = [
-            { id: 'freeweb', name: 'FreeWeb', tpl: 'https://freewebnovel.com/raising-villains-the-right-way/chapter-178.html' },
-            { id: 'webnovel', name: 'WebNovel', tpl: 'https://www.webnovel.com/book/34399524700668605/92441271259430324' }
-        ];
-        this.sites = JSON.parse(localStorage.getItem('neon_custom_sites')) || defaults;
+        // Оставляем пустым по умолчанию, чтобы мусорные сайты не возвращались
+        const saved = localStorage.getItem('neon_custom_sites');
+        this.sites = saved ? JSON.parse(saved) : [];
         this.renderSiteSelectors();
     },
 
@@ -865,7 +858,7 @@ const app = {
         }
         
         const bookId = 'book_' + Date.now().toString();
-        const newBook = { id: bookId, title: title, url: url, site: document.getElementById('site-select').value, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, cachedCount: 0 };
+        const newBook = { id: bookId, title: title, url: url, site: document.getElementById('site-select').value || 'custom', coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, cachedCount: 0 };
         
         this.currentBookId = bookId;
         this.library.push(newBook);
@@ -988,17 +981,20 @@ const app = {
         
         let ordered = [];
         if (anchor) {
-            // 2. Отматываем по prevUrl в самое начало цепочки
+            // 2. Отматываем по prevUrl в самое начало цепочки (или до якоря, если scope = 'forward')
             let current = anchor;
             let visited = new Set();
-            while (current.prevUrl && !visited.has(current.url)) {
-                visited.add(current.url);
-                let prev = chapters.find(c => isSameUrl(c.url, current.prevUrl));
-                if (prev) current = prev;
-                else break;
+            
+            if (scope === 'all') {
+                while (current.prevUrl && !visited.has(current.url)) {
+                    visited.add(current.url);
+                    let prev = chapters.find(c => isSameUrl(c.url, current.prevUrl));
+                    if (prev) current = prev;
+                    else break;
+                }
             }
             
-            // 3. Собираем идеальную цепь вперед (от 1 до конца)
+            // 3. Собираем идеальную цепь вперед (от начала до конца)
             let head = current.url;
             visited.clear();
             while (head && !visited.has(head)) {
@@ -1010,8 +1006,10 @@ const app = {
             }
             
             // 4. Если база фрагментирована, докидываем "оторванные" главы в конец
-            let missing = chapters.filter(c => !visited.has(c.url) && c.text && c.text.length > 100 && c.text !== "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ");
-            ordered.push(...missing);
+            if (scope === 'all') {
+                let missing = chapters.filter(c => !visited.has(c.url) && c.text && c.text.length > 100 && c.text !== "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ");
+                ordered.push(...missing);
+            }
         }
 
         if (ordered.length === 0) ordered = chapters.filter(c => c.text !== "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ");
@@ -1053,14 +1051,10 @@ const app = {
         if (format === 'fb2') {
             header = `<?xml version="1.0" encoding="utf-8"?>\n<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">\n<description>\n    <title-info>\n        <book-title>${this.escapeXML(book.title)}</book-title>\n        <author><first-name>NeonReader</first-name><last-name>PRO</last-name></author>\n        ${coverBase64 ? `<coverpage><image l:href="#cover.jpg"/></coverpage>` : ''}\n    </title-info>\n    <document-info>\n        <program-used>NeonReader</program-used>\n        <date>${new Date().toLocaleDateString('ru-RU')}</date>\n        <id>${book.id}</id>\n        <version>1.0</version>\n    </document-info>\n</description>\n<body>\n`;
             
-            // ОБЛОЖКА НА ПЕРВОЙ СТРАНИЦЕ
-            if (coverBase64) {
-                header += `    <section>\n        <p><image l:href="#cover.jpg"/></p>\n    </section>\n`;
-            }
-            
+            if (coverBase64) header += `    <section>\n        <p><image l:href="#cover.jpg"/></p>\n    </section>\n`;
             header += `    <title><p>${this.escapeXML(book.title)}</p></title>\n`;
             footer = `</body>\n`;
-            if (coverBase64) { footer += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`; }
+            if (coverBase64) footer += `<binary id="cover.jpg" content-type="image/jpeg">${coverBase64}</binary>\n`;
             footer += `</FictionBook>`;
         } else {
             header = `${book.title}\n=======================\n\n`;
@@ -1104,7 +1098,6 @@ const app = {
                     }
                     
                     await writeB64(chunk, true);
-                    // CHUNKING: Дыхание кода
                     if(i % 10 === 0) await new Promise(r => setTimeout(r, 10)); 
                 }
 
@@ -1177,7 +1170,6 @@ const app = {
         }
     },
 
-    // ОТПРАВКА В АЛИСУ
     async quickShareToYandex() {
         if (this.sents.length === 0) {
             this.clearToasts();
@@ -1251,7 +1243,7 @@ const app = {
         const book = this.library.find(b => b.id === id);
         if(book) { 
             this.currentBookId = book.id;
-            document.getElementById('site-select').value = book.site || 'freeweb'; 
+            document.getElementById('site-select').value = book.site || 'custom'; 
             document.getElementById('url-input').value = book.url; 
             this.toggleLibrary(); 
             this.processChapter(book.url, false); 
@@ -1297,17 +1289,12 @@ const app = {
         let success = false;
         
         const endpoints = [];
-        
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
             endpoints.push({ type: 'native', url: url });
         }
         
-        // Добавляем corsproxy.io (он лучше справляется с Cloudflare)
         endpoints.push({ type: 'proxy', url: `https://corsproxy.io/?${encodeURIComponent(url)}` });
-        // И еще один запасной
         endpoints.push({ type: 'proxy', url: `https://api.allorigins.hexart.org/raw?url=${encodeURIComponent(url)}` }); 
-        
-        // Оставляем старые как резерв
         endpoints.push({ type: 'proxy', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` });
         endpoints.push({ type: 'proxy', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` });
 
@@ -1333,7 +1320,7 @@ const app = {
                     text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || "");
                 } else {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 15000); // Увеличили до 15 секунд
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
                     const res = await fetch(ep.url, { signal: controller.signal });
                     clearTimeout(timeoutId);
                     status = res.status;
@@ -1382,30 +1369,23 @@ const app = {
         console.log("Начинаем парсинг текста из HTML...");
         const doc = new DOMParser().parseFromString(html, 'text/html');
         
-        // 0. Сразу вырезаем скрипты и стили, чтобы они не попали в текст
+        // 0. Вырезаем скрипты и стили
         doc.querySelectorAll('script, style, noscript, svg, iframe').forEach(el => el.remove());
         
         let paras = [];
         let mainContainer = null;
 
-        // 1. Умный поиск: ищем блок с наибольшим объемом чистого текста
+        // 1. Умный поиск контейнера с текстом
         let selectors = '.chapter-content, #chapter-content, .text-content, .text-left, article, .reader-text, .chapter-text, .entry-content, [itemprop="articleBody"]';
         let nodes = Array.from(doc.querySelectorAll(selectors));
-        
-        // Если по классам пусто, берем ВООБЩЕ ВСЕ <div> на странице
-        if (nodes.length === 0) {
-            nodes = Array.from(doc.querySelectorAll('div'));
-        }
+        if (nodes.length === 0) nodes = Array.from(doc.querySelectorAll('div'));
 
         let maxScore = 0;
         nodes.forEach(node => {
             let text = node.textContent.trim();
-            if (text.length < 300) return; // Игнорируем мелочь
+            if (text.length < 300) return; 
             
-            // Считаем "мусорность" блока (ссылки, меню, подвалы)
             let trashLen = Array.from(node.querySelectorAll('a, nav, footer, header, ul')).reduce((sum, el) => sum + (el.textContent ? el.textContent.length : 0), 0);
-            
-            // Очки = общий текст минус мусор (жестко штрафуем блоки с кучей ссылок)
             let score = text.length - (trashLen * 3);
             
             if (score > maxScore) {
@@ -1415,19 +1395,12 @@ const app = {
         });
 
         if (mainContainer) {
-            console.log("Найден главный контейнер. Длина текста:", mainContainer.textContent.length);
-            
-            // 2. Ищем теги <p> внутри победившего блока
             let pTags = Array.from(mainContainer.querySelectorAll('p, div.text'));
             
             if (pTags.length > 5) {
-                // Если есть нормальные параграфы — берем их
                 paras = pTags.map(p => p.textContent.trim());
             } else {
-                // Если <p> нет, значит текст закинут сплошняком через <br>
                 let rawHtml = mainContainer.innerHTML;
-                
-                // Превращаем все виды переносов в наш спец-разделитель
                 rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '|||SPLIT|||');
                 rawHtml = rawHtml.replace(/<\/p>/gi, '|||SPLIT|||');
                 rawHtml = rawHtml.replace(/<\/div>/gi, '|||SPLIT|||');
@@ -1440,7 +1413,7 @@ const app = {
             }
         }
 
-        // 3. Жесткий анти-мусорный фильтр (добивочный)
+        // 3. Анти-мусорный фильтр
         paras = paras.filter(text => {
             if (text.length < 20) return false;
             let lower = text.toLowerCase();
@@ -1453,28 +1426,37 @@ const app = {
             return true;
         });
 
-        console.log(`Найдено абзацев: ${paras.length}`);
-
-        // 4. СНАЧАЛА ИЩЕМ ССЫЛКИ НАВИГАЦИИ (даже если на странице нет текста!)
+        // 4. ПОИСК ССЫЛОК НАВИГАЦИИ (Абсолютный)
         let nUrl = null, pUrl = null;
-        Array.from(doc.querySelectorAll('a')).forEach(a => {
-            const linkText = a.textContent.toLowerCase().trim();
-            const className = (a.className || '').toLowerCase();
-            const href = a.getAttribute('href');
-            
-            if (!href || href === '#' || href.startsWith('javascript')) return;
-            
-            if (linkText.includes('next') || linkText.includes('след') || linkText.includes('вперед') || linkText.includes('→') || linkText.includes('»') || className.includes('next')) {
-                nUrl = new URL(href, url).href;
-            }
-            if (linkText.includes('prev') || linkText.includes('пред') || linkText.includes('назад') || linkText.includes('←') || linkText.includes('«') || className.includes('prev')) {
-                pUrl = new URL(href, url).href;
-            }
-        });
+        
+        let headNext = doc.querySelector('link[rel="next"]');
+        let headPrev = doc.querySelector('link[rel="prev"]');
+        if (headNext && headNext.getAttribute('href')) nUrl = new URL(headNext.getAttribute('href'), url).href;
+        if (headPrev && headPrev.getAttribute('href')) pUrl = new URL(headPrev.getAttribute('href'), url).href;
+
+        if (!nUrl || !pUrl) {
+            Array.from(doc.querySelectorAll('a')).forEach(a => {
+                const linkText = a.textContent.toLowerCase().trim();
+                const className = (a.className || '').toLowerCase();
+                let href = a.getAttribute('href');
+                
+                if (!href || href === '#' || href.startsWith('javascript')) return;
+                try { href = new URL(href, url).href; } catch(e) { return; }
+                
+                if (linkText.includes('последн') || linkText.includes('первая') || className.includes('last') || className.includes('first')) return;
+                
+                if (!nUrl && (linkText === 'далее' || linkText === 'вперед' || linkText.includes('следующ') || linkText.includes('next') || linkText === '»' || linkText === '→' || className.includes('next'))) {
+                    nUrl = href;
+                }
+                if (!pUrl && (linkText === 'назад' || linkText.includes('предыдущ') || linkText.includes('пред.') || linkText.includes('prev') || linkText === '«' || linkText === '←' || className.includes('prev'))) {
+                    pUrl = href;
+                }
+            });
+        }
         
         console.log(`Следующая: ${nUrl || "Нет"} | Предыдущая: ${pUrl || "Нет"}`);
 
-        // 5. ФОРМИРУЕМ ТЕКСТ. Если страница пустая - ставим системную метку, чтобы не рвать цепь
+        // 5. ПРОВЕРКА НА ПУСТУЮ СТРАНИЦУ
         let finalText = paras.join('\n\n');
         if (finalText.trim().length === 0) {
             console.warn("Текст не найден, но мы сохраняем страницу ради ссылок навигации.");
@@ -1511,7 +1493,6 @@ const app = {
         let firstChap = await NeonDB.getChapter(book.url);
         if (firstChap) {
             forwardUrl = (firstChap.nextUrl === book.url) ? null : firstChap.nextUrl;
-            // Если выбран режим "Только вперед", игнорируем ссылку назад
             if (direction === 'all') {
                 backwardUrl = (firstChap.prevUrl === book.url) ? null : firstChap.prevUrl;
             }
@@ -1528,7 +1509,7 @@ const app = {
                         let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
                         await NeonDB.saveChapter(forwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
                         
-                        // Если это самая первая скачанная страница, и нужен режим "Всю книгу", запускаем задний ход
+                        // Инициализация заднего хода, если скачали самую первую главу
                         if (direction === 'all' && forwardUrl === book.url && backwardUrl === null) {
                             backwardUrl = (data.prevUrl === book.url) ? null : data.prevUrl;
                         }
@@ -1681,7 +1662,7 @@ const app = {
             if (!isAppend) this.logToast("Готово. Плеер ожидает.", "ok");
         }
         
-        // Если мы в режиме "КНИГА", перерисовываем карту дорожки
+        // Перерисовка карты дорожки для режима КНИГИ
         if(!isAppend && this.progressMode === 'book') {
             this.loadBookProgressData();
         }
@@ -1717,7 +1698,6 @@ const app = {
         this.chapterMarkers.push({ index: this.sents.length, title: chapterTitle });
 
         const chunkSize = 200; 
-        
         let cleanedText = text.replace(/\n\s*\n/g, '\n');
         const paragraphs = cleanedText.split('\n');
 
@@ -1740,7 +1720,6 @@ const app = {
                     const span = document.createElement('span');
                     span.className = 'sentence'; span.id = 's-' + gIdx;
                     
-                    // ЗАКЛАДКИ
                     let saved = this.bookmarks[this.currentBookId];
                     let bmHtml = (saved && saved.url === document.getElementById('url-input').value && saved.index === gIdx) ? '<span class="bookmark-icon">🔖</span>' : '';
 
@@ -1761,7 +1740,6 @@ const app = {
             const span = document.createElement('span');
             span.className = 'sentence'; span.id = 's-' + gIdx;
             
-            // ЗАКЛАДКИ
             let saved = this.bookmarks[this.currentBookId];
             let bmHtml = (saved && saved.url === document.getElementById('url-input').value && saved.index === gIdx) ? '<span class="bookmark-icon">🔖</span>' : '';
 
@@ -1842,8 +1820,7 @@ const app = {
                 p.webkitPreservesPitch = true;
                 
                 await p.play();
-                // isPlaying уже ставится внутри p.onplay (надежнее)
-
+                
                 p.onended = () => {
                     if (this.isPlaying && this.currentIndex === index) {
                         this.activeIdx = nextIdx;
@@ -1892,7 +1869,6 @@ const app = {
         if(this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.players.forEach(p => { p.pause(); });
         if(window.speechSynthesis) window.speechSynthesis.cancel();
-        // isPlaying ставится в false внутри p.onpause
     },
 
     jump(delta) {
@@ -1900,7 +1876,6 @@ const app = {
         this.play(this.currentIndex + delta);
     },
 
-    // СКЛЕЙКА ЧАНКОВ В ОДИН МП3
     async downloadMp3() { 
         if (this.currentIndex === -1 || !this.sents.length) {
             return this.logToast("Нет данных для скачивания.", "error");
@@ -1911,18 +1886,18 @@ const app = {
         }
 
         this.isExportingMp3 = true;
-        this.stop(); // Останавливаем плеер
+        this.stop(); 
         
         let t = this.logToast("Сборка MP3: 0%", "ok", 0);
         const fill = document.getElementById('progress-fill');
         const oldColor = fill.style.background;
-        fill.style.background = '#f59e0b'; // Красим бар в оранжевый
+        fill.style.background = '#f59e0b'; 
         
         let buffers = [];
         try {
             for(let i=0; i<this.sents.length; i++) {
                 fill.style.width = ((i / this.sents.length) * 100) + '%';
-                if(t && t.querySelector('span')) t.querySelector('spaninnerText') = `Сборка MP3: ${Math.round((i/this.sents.length)*100)}%`;
+                if(t && t.querySelector('span')) t.querySelector('span').innerText = `Сборка MP3: ${Math.round((i/this.sents.length)*100)}%`;
                 
                 const url = this.getGoogleTTSUrl(this.sents[i]);
                 if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
@@ -1939,7 +1914,6 @@ const app = {
                 }
             }
             
-            // Бинарно склеиваем в один файл
             let totalLen = buffers.reduce((acc, b) => acc + b.length, 0);
             let merged = new Uint8Array(totalLen);
             let offset = 0;
@@ -1962,12 +1936,11 @@ const app = {
             this.logToast("Ошибка при склейке MP3", "error");
         }
         
-        fill.style.background = oldColor; // Возвращаем цвет
+        fill.style.background = oldColor; 
         this.isExportingMp3 = false;
-        this.updateUI(); // Возвращаем UI в норму
+        this.updateUI(); 
     },
     
-    // ЛОГИКА ЗУМА ПРОГРЕСС-БАРА
     async toggleProgressBarMode() {
         this.progressMode = this.progressMode === 'chapter' ? 'book' : 'chapter';
         const btn = document.getElementById('zoom-btn');
@@ -1983,7 +1956,6 @@ const app = {
         this.bookChaptersData = await NeonDB.getBookChapters(this.currentBookId);
         if (this.bookChaptersData.length === 0) return;
 
-        // Отматываем в начало
         let anchor = this.bookChaptersData[0];
         let current = anchor;
         let visited = new Set();
@@ -1994,7 +1966,6 @@ const app = {
             else break;
         }
 
-        // Выстраиваем отсортированный массив по связям
         let sorted = [];
         let head = current.url;
         visited.clear();
@@ -2006,11 +1977,9 @@ const app = {
             head = ch.nextUrl;
         }
 
-        // Докидываем потеряшек (если скачивание прерывалось)
         let missing = this.bookChaptersData.filter(c => !visited.has(c.url));
         sorted.push(...missing);
 
-        // Назначаем номера жестко по индексу
         sorted.forEach((ch, idx) => ch.num = idx + 1);
 
         this.bookChaptersData = sorted;
@@ -2018,7 +1987,7 @@ const app = {
     },
 
     seekProgress(e) {
-        if(this.isExportingMp3) return; // Запрещаем кликать во время экспорта
+        if(this.isExportingMp3) return; 
         const rect = e.currentTarget.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
         
@@ -2049,7 +2018,7 @@ const app = {
         
         this.clearToasts();
         this.logToast("Закладка сохранена!", "ok");
-        this.render(this.sents.join(" "), false); // Перерисовка для показа иконки
+        this.render(this.sents.join(" "), false); 
         setTimeout(() => this.jump(0), 100);
     },
     
@@ -2065,7 +2034,7 @@ const app = {
     },
 
     updateUI() {
-        if(this.isExportingMp3) return; // Не трогаем UI во время выгрузки MP3
+        if(this.isExportingMp3) return; 
         
         const iconPlay = `<svg class="icon-fill" style="width:22px;height:22px;margin-left:3px;" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
         const iconPause = `<svg class="icon-fill" style="width:18px;height:18px;" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
@@ -2111,7 +2080,6 @@ const app = {
                 mDiv.className = 'chapter-marker'; mDiv.style.left = pct + '%'; container.appendChild(mDiv);
             });
         } else {
-            // Режим 'chapter'
             const cachedBar = document.getElementById('progress-cached');
             if(cachedBar) cachedBar.style.width = "100%"; 
             if (!this.chapterMarkers || this.sents.length === 0) return;
