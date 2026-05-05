@@ -837,6 +837,13 @@ const app = {
         let title = this.currentBookMetadata.title || url.split('/').filter(Boolean).pop().replace(/-/g, ' ');
         title = title.charAt(0).toUpperCase() + title.slice(1);
         
+        // ПРОВЕРКА НА ДУБЛИКАТЫ: ищем по URL или по имени
+        let existingBook = this.library.find(b => b.url === url || b.title === title);
+        if (existingBook) {
+            this.currentBookId = existingBook.id;
+            return this.logToast("Эта книга уже есть в библиотеке!", "ok");
+        }
+        
         const bookId = 'book_' + Date.now().toString();
         const newBook = { id: bookId, title: title, url: url, site: document.getElementById('site-select').value, coverUrl: this.currentBookMetadata.cover || '', isDownloading: false, cachedCount: 0 };
         
@@ -935,65 +942,44 @@ const app = {
             catch(e) { return u1 === u2; }
         };
 
-        let currentUrl = book.url; 
-
-        if (scope === 'all') {
-            let firstChap = chapters.find(c => isSameUrl(c.url, book.url)) || chapters[0];
-            if (firstChap) {
-                let visited = new Set();
-                while (firstChap.prevUrl && !visited.has(firstChap.url)) {
-                    visited.add(firstChap.url);
-                    if (isSameUrl(firstChap.url, firstChap.prevUrl)) break; 
-                    let prev = chapters.find(c => isSameUrl(c.url, firstChap.prevUrl));
-                    if (prev) firstChap = prev;
-                    else break;
-                }
-                currentUrl = firstChap.url;
-            }
-        }
-
+        // 1. Находим "якорь" - любую гарантированно скачанную главу
+        let anchor = chapters.find(c => isSameUrl(c.url, book.url)) || chapters[0];
+        
         let ordered = [];
-        let visitedForward = new Set();
-
-        while(currentUrl && !visitedForward.has(currentUrl)) {
-            visitedForward.add(currentUrl);
-            let ch = chapters.find(c => isSameUrl(c.url, currentUrl));
-            if(!ch) break;
+        if (anchor) {
+            // 2. Отматываем по prevUrl в самое начало цепочки
+            let current = anchor;
+            let visited = new Set();
+            while (current.prevUrl && !visited.has(current.url)) {
+                visited.add(current.url);
+                let prev = chapters.find(c => isSameUrl(c.url, current.prevUrl));
+                if (prev) current = prev;
+                else break;
+            }
             
-            if (ch.text && ch.text.length > 100) ordered.push(ch);
-            if (isSameUrl(currentUrl, ch.nextUrl)) break; 
-            currentUrl = ch.nextUrl;
-        }
-
-        if (scope === 'all' && ordered.length < chapters.length) {
-            let missing = chapters.filter(c => !ordered.some(o => o.url === c.url));
-            missing.forEach(ch => {
-                let m = ch.url.match(/(?:chapter|ch|c|glava|gl|v\d+c|interlude|extra|special)[-_\s]*(\d+(?:[\.\-_]\d+)?)/i) || ch.url.match(/[-_](\d+(?:[\.\-_]\d+)?)(?:\.html|\/|)$/i);
-                ch.guessedNum = m ? parseFloat(m[1].replace(/[-_]/g, '.')) : 999999;
-            });
-            missing.sort((a, b) => a.guessedNum - b.guessedNum);
+            // 3. Собираем идеальную цепь вперед (от 1 до конца)
+            let head = current.url;
+            visited.clear();
+            while (head && !visited.has(head)) {
+                visited.add(head);
+                let ch = chapters.find(c => isSameUrl(c.url, head));
+                if (!ch) break;
+                if (ch.text && ch.text.length > 100 && ch.text !== "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ") ordered.push(ch);
+                head = ch.nextUrl;
+            }
+            
+            // 4. Если база фрагментирована, докидываем "оторванные" главы в конец
+            let missing = chapters.filter(c => !visited.has(c.url) && c.text && c.text.length > 100 && c.text !== "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ");
             ordered.push(...missing);
         }
 
-        if (ordered.length === 0) ordered = chapters;
+        if (ordered.length === 0) ordered = chapters.filter(c => c.text !== "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ");
 
-        // ПАРСЕР НОМЕРОВ
-        let lastNum = 0;
-        let isFirstNum = true;
-        ordered.forEach(ch => {
+        // 5. ПАРСЕР НОМЕРОВ (Теперь железобетонно по порядку цепи)
+        ordered.forEach((ch, idx) => {
             ch.isInterlude = /interlude|extra|side[-_]?story|special/i.test(ch.url);
             ch.prefix = ch.isInterlude ? "Интерлюдия" : "Глава";
-
-            let m = ch.url.match(/(?:chapter|ch|c|glava|gl|v\d+c|interlude|extra|special)[-_\s]*(\d+(?:[\.\-_]\d+)?)/i) || ch.url.match(/[-_](\d+(?:[\.\-_]\d+)?)(?:\.html|\/|)$/i);
-            
-            if (m) {
-                let cleanNum = m[1].replace(/[-_]/g, '.');
-                ch.displayNumber = parseFloat(cleanNum);
-                if (!ch.isInterlude) lastNum = ch.displayNumber; 
-            } else {
-                ch.displayNumber = isFirstNum ? 1 : lastNum + 0.5;
-            }
-            isFirstNum = false;
+            ch.displayNumber = idx + 1; 
         });
 
         let coverBase64 = "";
@@ -1274,6 +1260,13 @@ const app = {
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
             endpoints.push({ type: 'native', url: url });
         }
+        
+        // Добавляем corsproxy.io (он лучше справляется с Cloudflare)
+        endpoints.push({ type: 'proxy', url: `https://corsproxy.io/?${encodeURIComponent(url)}` });
+        // И еще один запасной
+        endpoints.push({ type: 'proxy', url: `https://api.allorigins.hexart.org/raw?url=${encodeURIComponent(url)}` }); 
+        
+        // Оставляем старые как резерв
         endpoints.push({ type: 'proxy', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` });
         endpoints.push({ type: 'proxy', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` });
 
@@ -1299,7 +1292,7 @@ const app = {
                     text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || "");
                 } else {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 8000);
+                    const timeoutId = setTimeout(() => controller.abort(), 15000); // Увеличили до 15 секунд
                     const res = await fetch(ep.url, { signal: controller.signal });
                     clearTimeout(timeoutId);
                     status = res.status;
@@ -1344,6 +1337,7 @@ const app = {
         }
 
         this.logToast(`Парсинг DOM...`, 'ok', 500);
+        
         console.log("Начинаем парсинг текста из HTML...");
         const doc = new DOMParser().parseFromString(html, 'text/html');
         
@@ -1419,27 +1413,35 @@ const app = {
         });
 
         console.log(`Найдено абзацев: ${paras.length}`);
-        if (paras.length === 0) {
-            this.logToast("СБОЙ: Текст не найден в разметке сайта.", "error", 10000);
-            throw new Error("Текст не найден.");
-        }
 
+        // 4. СНАЧАЛА ИЩЕМ ССЫЛКИ НАВИГАЦИИ (даже если на странице нет текста!)
         let nUrl = null, pUrl = null;
         Array.from(doc.querySelectorAll('a')).forEach(a => {
-            const linkText = a.innerText.toLowerCase();
+            const linkText = a.textContent.toLowerCase().trim();
+            const className = (a.className || '').toLowerCase();
             const href = a.getAttribute('href');
-            if (!href || href === '#') return;
-            if (linkText.includes('next') || linkText.includes('следующая') || linkText.includes('вперед')) {
+            
+            if (!href || href === '#' || href.startsWith('javascript')) return;
+            
+            if (linkText.includes('next') || linkText.includes('след') || linkText.includes('вперед') || linkText.includes('→') || linkText.includes('»') || className.includes('next')) {
                 nUrl = new URL(href, url).href;
             }
-            if (linkText.includes('prev') || linkText.includes('предыдущая') || linkText.includes('назад')) {
+            if (linkText.includes('prev') || linkText.includes('пред') || linkText.includes('назад') || linkText.includes('←') || linkText.includes('«') || className.includes('prev')) {
                 pUrl = new URL(href, url).href;
             }
         });
         
         console.log(`Следующая: ${nUrl || "Нет"} | Предыдущая: ${pUrl || "Нет"}`);
+
+        // 5. ФОРМИРУЕМ ТЕКСТ. Если страница пустая - ставим системную метку, чтобы не рвать цепь
+        let finalText = paras.join('\n\n');
+        if (finalText.trim().length === 0) {
+            console.warn("Текст не найден, но мы сохраняем страницу ради ссылок навигации.");
+            finalText = "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ";
+        }
+
         return { 
-            text: paras.join('\n\n'), 
+            text: finalText, 
             nextUrl: nUrl, 
             prevUrl: pUrl,
             title: doc.querySelector('title')?.innerText || "", 
@@ -1481,7 +1483,13 @@ const app = {
                         let data = await this.networkFetchCore(forwardUrl, book.site || 'freeweb');
                         let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
                         await NeonDB.saveChapter(forwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
+                        
+                        let oldUrl = forwardUrl;
                         forwardUrl = (forwardUrl === data.nextUrl) ? null : data.nextUrl;
+                        if (!forwardUrl && data.nextUrl) {
+                            console.error("ОСТАНОВКА: Кнопка 'Далее' ведет на ту же страницу!");
+                        }
+
                         count++;
                         book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
@@ -1492,7 +1500,11 @@ const app = {
 
                         await this.saveLibraryData(); 
                         await new Promise(r => setTimeout(r, 1500)); 
-                    } catch(e) { forwardUrl = null; }
+                    } catch(e) { 
+                        console.error("ОШИБКА НА ГЛАВЕ " + forwardUrl, e);
+                        this.logToast("Сбой на главе " + count, "error");
+                        forwardUrl = null; 
+                    }
                 }
             }
             if (backwardUrl && this.activeDownloads[id]) {
@@ -1504,7 +1516,10 @@ const app = {
                         let data = await this.networkFetchCore(backwardUrl, book.site || 'freeweb');
                         let textToSave = isTranslateMode ? await this.translate(data.text) : data.text;
                         await NeonDB.saveChapter(backwardUrl, id, textToSave, data.nextUrl, data.prevUrl);
+                        
+                        let oldUrl = backwardUrl;
                         backwardUrl = (backwardUrl === data.prevUrl) ? null : data.prevUrl;
+                        
                         count++;
                         book.cachedCount = count;
                         if(badge) badge.innerText = `${count} глав`;
@@ -1515,7 +1530,11 @@ const app = {
 
                         await this.saveLibraryData(); 
                         await new Promise(r => setTimeout(r, 1500)); 
-                    } catch(e) { backwardUrl = null; }
+                    } catch(e) { 
+                        console.error("ОШИБКА НА ГЛАВЕ " + backwardUrl, e);
+                        this.logToast("Сбой на главе " + count, "error");
+                        backwardUrl = null; 
+                    }
                 }
             }
         }
@@ -1582,6 +1601,17 @@ const app = {
 
         document.getElementById('url-input').value = url;
         let chapterLabel = url.split('/').filter(Boolean).pop().replace(/-/g, ' ');
+
+        // --- АВТОСКИП ПУСТЫХ СТРАНИЦ ---
+        if (rawText === "ПРОПУСК_ПУСТОЙ_СТРАНИЦЫ") {
+            this.logToast("Пустая страница, листаем дальше...", "ok");
+            if (this.nextUrl) {
+                return this.processChapter(this.nextUrl, isAppend);
+            } else {
+                return this.logToast("Конец доступных глав.", "ok");
+            }
+        }
+        // -------------------------------
 
         let finalText = rawText;
         if (mode === "translate" && !isAlreadyTranslated) {
@@ -1907,8 +1937,39 @@ const app = {
 
     async loadBookProgressData() {
         this.bookChaptersData = await NeonDB.getBookChapters(this.currentBookId);
-        this.bookChaptersData.forEach(ch => { let m = ch.url.match(/[-_](\d+(?:[\.\-_]\d+)?)(?:\.html|\/|)$/i); ch.num = m ? parseFloat(m[1].replace(/[-_]/g, '.')) : 999; });
-        this.bookChaptersData.sort((a,b) => a.num - b.num);
+        if (this.bookChaptersData.length === 0) return;
+
+        // Отматываем в начало
+        let anchor = this.bookChaptersData[0];
+        let current = anchor;
+        let visited = new Set();
+        while (current.prevUrl && !visited.has(current.url)) {
+            visited.add(current.url);
+            let prev = this.bookChaptersData.find(c => c.url === current.prevUrl);
+            if (prev) current = prev;
+            else break;
+        }
+
+        // Выстраиваем отсортированный массив по связям
+        let sorted = [];
+        let head = current.url;
+        visited.clear();
+        while (head && !visited.has(head)) {
+            visited.add(head);
+            let ch = this.bookChaptersData.find(c => c.url === head);
+            if (!ch) break;
+            sorted.push(ch);
+            head = ch.nextUrl;
+        }
+
+        // Докидываем потеряшек (если скачивание прерывалось)
+        let missing = this.bookChaptersData.filter(c => !visited.has(c.url));
+        sorted.push(...missing);
+
+        // Назначаем номера жестко по индексу
+        sorted.forEach((ch, idx) => ch.num = idx + 1);
+
+        this.bookChaptersData = sorted;
         this.updateVisualizers();
     },
 
@@ -2029,5 +2090,5 @@ window.onload = async () => {
     await app.init();
 };
 </script>
-</body>
+</body</html>>
 </html>
