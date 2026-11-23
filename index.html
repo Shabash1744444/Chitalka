@@ -250,6 +250,9 @@
 .reader-demo-row button{font-size:12px;padding:8px 12px;color:var(--text-color);border-color:var(--glass-border);background:rgba(255,255,255,.06)}
 .reader-demo-row span{font-size:11px;color:var(--subtext);line-height:1.4}
 @media(max-width:600px){.reader-demo-row{align-items:flex-start}.reader-demo-row span{width:100%}}
+
+.reader-import-label{display:inline-flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;padding:8px 12px;color:var(--text-color);border:1px solid var(--glass-border);background:rgba(255,255,255,.06);border-radius:8px}
+.reader-import-label:focus-within{outline:2px solid var(--theme-hex)}
 </style>
 </head>
 
@@ -391,7 +394,9 @@
     </div>
     <div class="reader-demo-row">
         <button type="button" class="action-btn" onclick="app.openDemo()">Открыть пример</button>
-        <span>Тестовый текст без загрузки с внешних сайтов · В разработке</span>
+        <label for="local-book-input" class="action-btn reader-import-label">Открыть TXT / FB2</label>
+        <input id="local-book-input" type="file" accept=".txt,.fb2,text/plain,application/xml" hidden onchange="app.importLocalFile(event)">
+        <span>Локальное чтение без сторонних сайтов · В разработке</span>
     </div>
 </header>
 
@@ -1600,6 +1605,58 @@ const app = {
         if(book) { book.isDownloading = false; this.saveLibraryData(); this.clearToasts(); this.logToast("Загрузка прервана.", "ok"); this.renderLibraryGrid(); }
     },
 
+
+
+    async importLocalFile(event) {
+        const input = event.target;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        try {
+            if (file.size > 5 * 1024 * 1024) {
+                throw new Error('Для этой версии максимальный размер файла — 5 МБ.');
+            }
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (ext !== 'txt' && ext !== 'fb2') {
+                throw new Error('Поддерживаются файлы TXT и FB2.');
+            }
+            const bytes = await file.arrayBuffer();
+            const head = Array.from(new Uint8Array(bytes, 0, Math.min(256,bytes.byteLength)))
+                .map(b => String.fromCharCode(b)).join('');
+            const declared = head.match(/encoding\s*=\s*["']([^"']+)["']/i)?.[1];
+            const decode = (encoding) => new TextDecoder(encoding).decode(bytes);
+            let content = declared ? decode(declared) : decode('utf-8');
+            if (!declared && content.includes('\uFFFD')) {
+                content = decode('windows-1251');
+            }
+            let title = file.name.replace(/\.(txt|fb2)$/i, '');
+            let text = content;
+            if (ext === 'fb2') {
+                const xml = new DOMParser().parseFromString(content, 'application/xml');
+                if (xml.querySelector('parsererror')) throw new Error('Ошибка чтения структуры FB2.');
+                const bookTitle = xml.getElementsByTagNameNS('*','book-title')[0]?.textContent?.trim();
+                if (bookTitle) title = bookTitle;
+                const body = xml.getElementsByTagNameNS('*','body')[0];
+                if (!body) throw new Error('В FB2 не найден текст книги.');
+                text = Array.from(body.getElementsByTagNameNS('*','p'))
+                    .map(el => el.textContent.trim()).filter(Boolean).join('\n\n');
+            }
+            if (!text.trim()) throw new Error('В файле нет текста для чтения.');
+            this.stop();
+            this.currentBookId = 'current';
+            this.nextUrl = null;
+            this.prevUrl = null;
+            this.currentBookMetadata = {title, cover:''};
+            document.getElementById('url-input').value = '';
+            document.getElementById('voice-engine-select').value = 'offline';
+            this.render(text, false, title);
+            this.logToast('Открыт файл: ' + title + '. Используйте кнопку воспроизведения.', 'ok', 5000);
+        } catch (error) {
+            console.error('Ошибка импорта файла:', error);
+            this.logToast('Не удалось открыть файл: ' + error.message, 'error', 5000);
+        } finally {
+            input.value = '';
+        }
+    },
 
     openDemo() {
         const sample = [
