@@ -1490,7 +1490,7 @@ const app = {
             text: finalText, 
             nextUrl: nUrl, 
             prevUrl: pUrl,
-            title: doc.querySelector('title')?.innerText || "", 
+            title: doc.querySelector('title')?.textContent || "", 
             cover: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || "" 
         };
     },
@@ -1606,7 +1606,7 @@ const app = {
             'В мастерской стояла маленькая настольная лампа. Её мягкий свет падал на лист бумаги, где были нарисованы первые детали будущего устройства. Сначала существовал только чертёж, затем появились модели и прототипы.',
             'После нескольких попыток детали подошли друг к другу. Теперь оставалось собрать корпус и проверить, как работает электроника. Иногда для хорошего результата нужно не торопиться, а внимательно посмотреть на то, что получилось.',
             'Этот короткий текст создан специально для проверки читалки. Можно нажать кнопку воспроизведения, изменить размер шрифта, выбрать голос и сохранить закладку. Интернет для загрузки текста не требуется, но доступность системного голоса зависит от браузера.'
-        ].join('\\n\\n');
+        ].join('\n\n');
         this.stop();
         this.currentBookId = 'current';
         this.nextUrl = null;
@@ -1893,16 +1893,24 @@ const app = {
 
                 if (index + 1 < this.sents.length) {
                     this.getAudioBlobUrl(this.sents[index + 1]).then(url => {
+                        if (requestId !== this.playRequest) return;
                         nextP.src = url;
                         nextP.preload = "auto";
                         nextP.load();
-                    });
+                    }).catch(e => console.warn('Предзагрузка озвучивания не удалась', e));
                 }
             } catch(e) {
                 console.error("Сбой плеера:", e);
-                if (!this.isPlaying) return;
+                if (requestId !== this.playRequest) return;
+                if (!document.getElementById('cfg-autoresume')?.checked) {
+                    this.stop();
+                    this.logToast('Онлайн-озвучивание недоступно. Выберите системный голос.', 'error', 5000);
+                    return;
+                }
                 if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = setTimeout(() => this.play(this.currentIndex), 3000);
+                this.reconnectTimer = setTimeout(() => {
+                    if (requestId === this.playRequest) this.play(this.currentIndex);
+                }, 3000);
             }
         } else {
             if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
@@ -2070,11 +2078,12 @@ const app = {
     seekProgress(e) {
         if(this.isExportingMp3) return; 
         const rect = e.currentTarget.getBoundingClientRect();
-        const pct = (e.clientX - rect.left) / rect.width;
+        if (rect.width <= 0) return;
+        const pct = Math.max(0, Math.min(0.999999, (e.clientX - rect.left) / rect.width));
         
         if (this.progressMode === 'chapter') {
             if(!this.sents.length) return;
-            this.players.forEach(p => p.pause());
+            this.stop();
             this.play(Math.floor(this.sents.length * pct));
         } else {
             if(!this.bookChaptersData.length) return;
@@ -2115,7 +2124,8 @@ const app = {
         console.log("Переход на следующую главу.");
         if (this.nextUrl && !this.isFetchingNext) { 
             this.isFetchingNext = true;
-            this.processChapter(this.nextUrl, forceAppend).then(() => this.isFetchingNext = false);
+            this.processChapter(this.nextUrl, forceAppend)
+                .finally(() => { this.isFetchingNext = false; });
         } else {
             this.clearToasts();
             this.logToast("Ссылка не найдена.", "error");
