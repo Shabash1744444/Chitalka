@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="referrer" content="no-referrer">
-    <title>NeonReader: Ultimate PRO</title>
+    <title>NeonReader — чтение и озвучивание</title>
     
     <script>
         window.appLogs = [];
@@ -244,7 +244,13 @@
         .captcha-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
         .captcha-title { color:var(--theme-hex); font-size: 15px; display:flex; align-items:center; gap:8px; font-weight:bold; text-shadow: 0 0 calc(10px * var(--glow-int)) rgba(var(--theme-rgb), 0.5); }
         .captcha-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); border:1px solid var(--glass-border); border-radius:12px; padding:20px; text-align:center; box-shadow: inset 0 0 calc(20px * var(--glow-int)) rgba(var(--theme-rgb), 0.1); }
-    </style>
+    
+/* Локальное демо для портфолио */
+.reader-demo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:9px}
+.reader-demo-row button{font-size:12px;padding:8px 12px;color:var(--text-color);border-color:var(--glass-border);background:rgba(255,255,255,.06)}
+.reader-demo-row span{font-size:11px;color:var(--subtext);line-height:1.4}
+@media(max-width:600px){.reader-demo-row{align-items:flex-start}.reader-demo-row span{width:100%}}
+</style>
 </head>
 
 <body>
@@ -382,6 +388,10 @@
                 <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
         </div>
+    </div>
+    <div class="reader-demo-row">
+        <button type="button" class="action-btn" onclick="app.openDemo()">Открыть пример</button>
+        <span>Тестовый текст без загрузки с внешних сайтов · В разработке</span>
     </div>
 </header>
 
@@ -577,7 +587,7 @@ const NeonDB = {
 const app = {
     sents: [], currentIndex: -1, isPlaying: false,
     players: [new Audio(), new Audio()], activeIdx: 0, audioBufferCache: {},
-    reconnectTimer: null,
+    reconnectTimer: null, playRequest: 0,
     nextUrl: null, prevUrl: null, currentBookId: 'current',
     chapterMarkers: [], isFetchingNext: false,
     library: [], voices: [], sites: [], bookmarks: {}, bookChaptersData: [],
@@ -600,8 +610,8 @@ const app = {
             if (window.cordova && cordova.plugins && cordova.plugins.backgroundMode) {
                 const bgMode = cordova.plugins.backgroundMode;
                 bgMode.setDefaults({
-                    title: 'NeonReader PRO',
-                    text: 'Работа в фоне активна',
+                    title: 'NeonReader',
+                    text: 'Чтение и озвучивание',
                     resume: true,
                     hidden: false,
                     silent: true
@@ -634,9 +644,17 @@ const app = {
             
             p.onended = () => { if(this.isPlaying) this.jump(1); };
             p.onerror = () => {
-                if (!this.isPlaying) return;
+                if (requestId !== this.playRequest) return;
+                const retry = document.getElementById('cfg-autoresume')?.checked;
+                if (!retry) {
+                    this.stop();
+                    this.logToast('Не удалось воспроизвести звук. Попробуйте системный голос.', 'error');
+                    return;
+                }
                 if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-                this.reconnectTimer = setTimeout(() => this.play(this.currentIndex), 3000);
+                this.reconnectTimer = setTimeout(() => {
+                    if (requestId === this.playRequest) this.play(this.currentIndex);
+                }, 3000);
             };
         });
 
@@ -665,7 +683,12 @@ const app = {
                     document.getElementById('url-input').value = data.url;
                     console.log("Запуск сохраненной сессии...");
                     this.processChapter(data.url, false).then(() => {
-                        if(data.index !== undefined) setTimeout(() => this.play(data.index), 800);
+                        // Браузеры требуют пользовательского действия для начала аудио.
+                        // Восстанавливаем место чтения, но не запускаем звук автоматически.
+                        if (this.sents.length && Number.isInteger(data.index)) {
+                            this.currentIndex = Math.max(0, Math.min(data.index, this.sents.length - 1));
+                            this.updateUI();
+                        }
                     });
                 }
             } catch(e) {}
@@ -713,7 +736,7 @@ const app = {
     },
 
     loadSettings() {
-        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', text: '#f1f5f9', cached: '#10b981', glow: 1, speed: 1.0, autoresume: true, engine: 'quality', size: 18 };
+        const conf = JSON.parse(localStorage.getItem('neon_custom_ui')) || { theme: '#a855f7', bg: '#0a0a0f', font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', text: '#f1f5f9', cached: '#10b981', glow: 1, speed: 1.0, autoresume: true, engine: 'offline', size: 18 };
         document.getElementById('cfg-theme').value = conf.theme || '#a855f7';
         document.getElementById('cfg-bg').value = conf.bg || '#0a0a0f';
         document.getElementById('cfg-text').value = conf.text || '#f1f5f9';
@@ -735,7 +758,7 @@ const app = {
             document.getElementById('cfg-autoresume').checked = conf.autoresume !== false;
         }
         if(document.getElementById('voice-engine-select')) {
-             document.getElementById('voice-engine-select').value = conf.engine || 'quality';
+             document.getElementById('voice-engine-select').value = conf.engine || 'offline';
         }
         this.applySettingsUI(conf);
     },
@@ -1577,6 +1600,24 @@ const app = {
         if(book) { book.isDownloading = false; this.saveLibraryData(); this.clearToasts(); this.logToast("Загрузка прервана.", "ok"); this.renderLibraryGrid(); }
     },
 
+
+    openDemo() {
+        const sample = [
+            'В мастерской стояла маленькая настольная лампа. Её мягкий свет падал на лист бумаги, где были нарисованы первые детали будущего устройства. Сначала существовал только чертёж, затем появились модели и прототипы.',
+            'После нескольких попыток детали подошли друг к другу. Теперь оставалось собрать корпус и проверить, как работает электроника. Иногда для хорошего результата нужно не торопиться, а внимательно посмотреть на то, что получилось.',
+            'Этот короткий текст создан специально для проверки читалки. Можно нажать кнопку воспроизведения, изменить размер шрифта, выбрать голос и сохранить закладку. Интернет для загрузки текста не требуется, но доступность системного голоса зависит от браузера.'
+        ].join('\\n\\n');
+        this.stop();
+        this.currentBookId = 'current';
+        this.nextUrl = null;
+        this.prevUrl = null;
+        this.currentBookMetadata = {title: 'Демонстрационный текст', cover: ''};
+        document.getElementById('url-input').value = '';
+        document.getElementById('voice-engine-select').value = 'offline';
+        this.render(sample, false, 'Пример');
+        this.logToast('Пример открыт. Для озвучивания нажмите воспроизведение.', 'ok', 4500);
+    },
+
     async processChapter(overrideUrl = null, isAppend = false) {
         const url = overrideUrl || document.getElementById('url-input').value;
         const mode = document.getElementById('mode-select').value; 
@@ -1681,6 +1722,24 @@ const app = {
         return result;
     },
 
+
+    fillSentence(span, text, bookmarked) {
+        const parts = text.split('<br><br>');
+        parts.forEach((part, index) => {
+            if (index) {
+                span.appendChild(document.createElement('br'));
+                span.appendChild(document.createElement('br'));
+            }
+            span.appendChild(document.createTextNode(part));
+        });
+        if (bookmarked) {
+            const icon = document.createElement('span');
+            icon.className = 'bookmark-icon';
+            icon.textContent = '🔖';
+            span.appendChild(icon);
+        }
+    },
+
     render(text, isAppend = false, chapterTitle = '') {
         console.log("Рендер текста...");
         const container = document.getElementById('reader-container');
@@ -1723,7 +1782,7 @@ const app = {
                     let saved = this.bookmarks[this.currentBookId];
                     let bmHtml = (saved && saved.url === document.getElementById('url-input').value && saved.index === gIdx) ? '<span class="bookmark-icon">🔖</span>' : '';
 
-                    span.innerHTML = currentChunkText + " " + bmHtml;
+                    this.fillSentence(span, currentChunkText, !!bmHtml);
                     span.onclick = () => { this.players.forEach(pl => pl.pause()); this.play(gIdx); };
                     
                     this.sents.push(currentChunkText.replace(/<br>/g, ' ').trim());
@@ -1743,7 +1802,7 @@ const app = {
             let saved = this.bookmarks[this.currentBookId];
             let bmHtml = (saved && saved.url === document.getElementById('url-input').value && saved.index === gIdx) ? '<span class="bookmark-icon">🔖</span>' : '';
 
-            span.innerHTML = currentChunkText + " " + bmHtml;
+            this.fillSentence(span, currentChunkText, !!bmHtml);
             span.onclick = () => { this.players.forEach(pl => pl.pause()); this.play(gIdx); };
             
             this.sents.push(currentChunkText.replace(/<br>/g, ' ').trim());
@@ -1785,6 +1844,7 @@ const app = {
     },
 
     async play(index) {
+        const requestId = ++this.playRequest;
         if (index >= this.sents.length) {
             if (this.nextUrl && !this.isFetchingNext) {
                 this.isFetchingNext = true;
@@ -1814,15 +1874,18 @@ const app = {
                 const nextIdx = (this.activeIdx + 1) % 2;
                 const nextP = this.players[nextIdx];
 
-                p.src = await this.getAudioBlobUrl(text);
+                const audioUrl = await this.getAudioBlobUrl(text);
+                if (requestId !== this.playRequest) return;
+                p.src = audioUrl;
                 p.playbackRate = speed;
                 p.preservesPitch = true;
                 p.webkitPreservesPitch = true;
                 
                 await p.play();
-                
+                if (requestId !== this.playRequest) { p.pause(); return; }
+
                 p.onended = () => {
-                    if (this.isPlaying && this.currentIndex === index) {
+                    if (requestId === this.playRequest && this.isPlaying && this.currentIndex === index) {
                         this.activeIdx = nextIdx;
                         this.play(index + 1);
                     }
@@ -1842,6 +1905,11 @@ const app = {
                 this.reconnectTimer = setTimeout(() => this.play(this.currentIndex), 3000);
             }
         } else {
+            if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+                this.stop();
+                this.logToast('Системное озвучивание недоступно в этом браузере.', 'error');
+                return;
+            }
             window.speechSynthesis.cancel();
             const utt = new SpeechSynthesisUtterance(text);
             utt.lang = 'ru-RU';
@@ -1849,7 +1917,13 @@ const app = {
             if (this.voices.length > 0) {
                 utt.voice = this.voices.find(v => v.name.includes('Google') || v.lang.includes('ru')) || this.voices[0];
             }
-            utt.onend = () => { if (this.isPlaying) this.jump(1); };
+            utt.onend = () => { if (requestId === this.playRequest && this.isPlaying) this.jump(1); };
+            utt.onerror = () => {
+                if (requestId === this.playRequest) {
+                    this.stop();
+                    this.logToast('Ошибка системного озвучивания.', 'error');
+                }
+            };
             window.speechSynthesis.speak(utt);
             this.isPlaying = true;
         }
@@ -1866,14 +1940,21 @@ const app = {
     },
 
     stop() {
-        if(this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.players.forEach(p => { p.pause(); });
-        if(window.speechSynthesis) window.speechSynthesis.cancel();
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.playRequest++;
+        this.isPlaying = false;
+        this.players.forEach(p => p.pause());
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        this.updateUI();
     },
 
     jump(delta) {
-        this.players.forEach(p => p.pause());
-        this.play(this.currentIndex + delta);
+        const target = this.currentIndex + delta;
+        this.stop();
+        this.play(target);
     },
 
     async downloadMp3() { 
@@ -2018,8 +2099,16 @@ const app = {
         
         this.clearToasts();
         this.logToast("Закладка сохранена!", "ok");
-        this.render(this.sents.join(" "), false); 
-        setTimeout(() => this.jump(0), 100);
+        // Не пересобираем текст: иначе теряются абзацы, границы глав и навигация.
+        document.querySelectorAll('.bookmark-icon').forEach(node => node.remove());
+        const sentence = document.getElementById('s-' + this.currentIndex);
+        if (sentence) {
+            const marker = document.createElement('span');
+            marker.className = 'bookmark-icon';
+            marker.textContent = '🔖';
+            marker.setAttribute('aria-label', 'Закладка');
+            sentence.appendChild(marker);
+        }
     },
     
     nextChapter(forceAppend = false) { 
